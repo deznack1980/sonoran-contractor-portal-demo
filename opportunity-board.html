@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Opportunity Pipeline</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="page-head">
+      <div>
+        <div class="muted" style="font-size:13px">Move from permit signal to contractor action</div>
+      </div>
+      <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="opportunities.html">List View</a>
+        <a class="btn btn-sm btn-primary" href="material-list-intake.html">New Material List</a>
+      </div>
+    </div>
+
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="stack" style="display:grid;grid-template-columns:minmax(220px,1fr) 180px 180px;gap:10px">
+        <input id="boardSearch" type="search" placeholder="Search contractor, address, permit, city…" />
+        <select id="boardScore">
+          <option value="60">Score 60+</option>
+          <option value="70">Score 70+</option>
+          <option value="80">Score 80+</option>
+          <option value="90">Score 90+</option>
+        </select>
+        <select id="boardOwner">
+          <option value="">All assigned work</option>
+          <option value="mine">My opportunities</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="boardSummary" class="kpi-grid" style="margin-bottom:18px"></div>
+    <div id="board" class="crm-board"></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="opportunity-board.js"></script>
+</body>
+</html>
