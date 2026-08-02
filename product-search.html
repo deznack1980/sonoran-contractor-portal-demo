@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Products</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <p class="muted" style="margin-top:0">Search supplier catalogs by SKU, manufacturer part number, name, description, or category.</p>
+    <div class="filters">
+      <input type="text" id="q" placeholder="Search products (e.g. water heater, 9051)…" style="min-width:280px" />
+      <input type="text" id="category" placeholder="Category filter…" style="max-width:180px" />
+      <label class="row" style="gap:6px"><input type="checkbox" id="inStock" style="width:auto" /> In stock only</label>
+      <button class="btn btn-primary btn-sm" id="searchBtn">Search</button>
+      <span class="muted" id="resultCount"></span>
+    </div>
+    <div class="table-wrap"><table class="tbl responsive" id="productsTable">
+      <thead><tr>
+        <th>Product</th><th>SKU</th><th>Mfr part #</th><th>Category</th>
+        <th>Supplier</th><th>Price</th><th>Qty</th><th>Lead time</th><th>Warehouse</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="product-search.js"></script>
+</body>
+</html>

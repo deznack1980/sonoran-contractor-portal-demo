@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Company</title>
+  <link rel="stylesheet" href="portal.css" />
+  <style>
+    .profile-header { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-bottom:6px; }
+    .ph-meta { display:flex; flex-wrap:wrap; gap:8px 18px; font-size:13px; color:var(--text-2); margin-top:8px; }
+    .ph-meta b { color:var(--text); font-weight:600; }
+    .action-bar { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 6px; }
+    .two-col { display:grid; grid-template-columns: 1.15fr 1fr; gap:18px; align-items:start; }
+    @media (max-width:900px){ .two-col { grid-template-columns:1fr; } }
+    .metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; }
+    .metric { background:var(--surface-2); border-radius:var(--radius-sm); padding:12px 14px; }
+    .metric .v { font-size:22px; font-weight:700; } .metric .l { font-size:12px; color:var(--text-3); }
+    .kv { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13.5px; }
+    .kv dt { color:var(--text-3); } .kv dd { margin:0; font-weight:550; }
+  </style>
+</head>
+<body>
+  <template id="pageContent">
+    <a href="my-companies.html" class="btn btn-ghost btn-sm" style="margin-bottom:12px">← My Companies</a>
+    <div id="root"><div class="skel skel-row" style="height:120px"></div></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="sales-company-profile.js"></script>
+</body>
+</html>

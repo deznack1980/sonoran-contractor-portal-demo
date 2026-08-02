@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CorridorIQ Municipal Knowledge Engine — review unknown statuses, permit codes, and keywords." />
+  <title>CorridorIQ — Knowledge Review</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .knowledge-main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+    .knowledge-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 22px; }
+    .knowledge-tab {
+      border: 1px solid #c9c2b4; background: #fff; padding: 8px 14px;
+      cursor: pointer; font: inherit; color: #2c2a26;
+    }
+    .knowledge-tab.is-active { background: #1f4e79; color: #fff; border-color: #1f4e79; }
+    .knowledge-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .knowledge-stat { background: #f7f4ee; padding: 14px 16px; border: 1px solid #e4ddd0; }
+    .knowledge-stat strong { display: block; font-size: 1.4rem; color: #1f4e79; }
+    .knowledge-stat span { color: #666; font-size: 0.9rem; }
+    .knowledge-card {
+      border: 1px solid #e4ddd0; background: #fff; padding: 16px 18px; margin-bottom: 12px;
+    }
+    .knowledge-card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+    .knowledge-meta { color: #666; font-size: 0.9rem; margin-bottom: 10px; }
+    .knowledge-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 12px; }
+    .knowledge-actions label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #444; }
+    .knowledge-actions input, .knowledge-actions select {
+      min-width: 140px; padding: 6px 8px; border: 1px solid #c9c2b4; font: inherit;
+    }
+    .knowledge-actions .btn { border: none; cursor: pointer; }
+    .btn-approve { background: #1f4e79; color: #fff; padding: 8px 12px; }
+    .btn-reject { background: #8a4b2c; color: #fff; padding: 8px 12px; }
+    .knowledge-banner { background: #eef4f9; border: 1px solid #c5d6e6; padding: 12px 14px; margin-bottom: 16px; }
+    .knowledge-empty { color: #666; padding: 24px 0; }
+    .api-status { font-size: 0.9rem; margin-top: 6px; }
+    .api-status.ok { color: #1b6b3a; }
+    .api-status.bad { color: #8a2b2b; }
+    .knowledge-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 16px; }
+    .knowledge-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: #444; }
+    .knowledge-filters input, .knowledge-filters select { padding: 6px 8px; border: 1px solid #c9c2b4; font: inherit; min-width: 150px; }
+    .tier-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; color: #fff; }
+    .tier-Critical { background: #a11; }
+    .tier-High { background: #c96a12; }
+    .tier-Medium { background: #1f4e79; }
+    .tier-Low { background: #767268; }
+    .conf-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.76rem; background:#efeadd; color:#3a3730; }
+    .knowledge-card.is-selected { outline: 2px solid #1f4e79; }
+    .card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .card-select { display:flex; align-items:center; gap:6px; font-size:0.82rem; color:#444; }
+    .impact-panel { background:#f7f9fb; border:1px solid #c5d6e6; padding:12px 14px; margin-top:12px; font-size:0.88rem; }
+    .impact-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 16px; margin:8px 0; }
+    .impact-grid div span { color:#666; }
+    .impact-grid div strong { display:block; font-size:1.05rem; color:#1f4e79; }
+    .impact-warning { background:#fff3e0; border:1px solid #e0a96d; padding:8px 10px; margin-top:8px; color:#8a4b1c; font-weight:600; }
+    .impact-examples { width:100%; border-collapse:collapse; margin-top:8px; font-size:0.82rem; }
+    .impact-examples th, .impact-examples td { border:1px solid #e4ddd0; padding:4px 6px; text-align:left; }
+    .btn-preview { background:#0b6; color:#fff; padding:8px 12px; border:none; cursor:pointer; }
+    .btn-secondary { background:#efeadd; color:#2c2a26; padding:8px 12px; border:1px solid #c9c2b4; cursor:pointer; }
+    .batch-toolbar { position: sticky; top: 0; z-index: 5; background:#1f4e79; color:#fff; padding:12px 14px; margin-bottom:14px; display:none; flex-wrap:wrap; gap:10px; align-items:end; }
+    .batch-toolbar.is-visible { display:flex; }
+    .batch-toolbar label { display:flex; flex-direction:column; gap:4px; font-size:0.8rem; }
+    .batch-toolbar input, .batch-toolbar select { padding:6px 8px; border:none; font:inherit; min-width:130px; }
+    .audit-table { width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:12px; }
+    .audit-table th, .audit-table td { border:1px solid #e4ddd0; padding:5px 7px; text-align:left; }
+    .audit-table th { background:#f7f4ee; }
+    details.audit-wrap { margin-top:26px; }
+    details.audit-wrap summary { cursor:pointer; font-weight:700; color:#1f4e79; padding:8px 0; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+            <div class="logo-icon">CIQ</div>
+            <div class="logo-text">
+              <p class="title">CorridorIQ</p>
+              <p class="subtitle">Municipal Knowledge Engine</p>
+            </div>
+          </a>
+        </div>
+        <nav class="nav-links">
+          <a href="dashboard.html" class="nav-item">Dashboard</a>
+          <a href="reports.html?report=qualifying" class="nav-item">Reports</a>
+          <a href="knowledge.html" class="nav-item">Knowledge Review</a>
+        </nav>
+        <button type="button" class="mobile-menu-toggle" aria-label="Toggle Navigation">&#9776;</button>
+      </div>
+    </header>
+
+    <main class="knowledge-main">
+      <p class="section-subtitle gold-text" style="margin-bottom:6px;">Admin</p>
+      <h1 class="page-title">Knowledge review queue</h1>
+      <p>
+        Approve unknown statuses, permit codes, and keywords into permanent dictionaries.
+        Scoring weights stay unchanged — new terminology is taught through approved mappings.
+      </p>
+      <div class="knowledge-banner">
+        <strong>API:</strong> <code>python -m pipeline.knowledge.review_api</code>
+        (default <code>http://127.0.0.1:8765</code>)
+        <div id="apiStatus" class="api-status">Checking API…</div>
+      </div>
+
+      <div class="knowledge-stats" id="statGrid"></div>
+
+      <div class="knowledge-tabs" role="tablist">
+        <button type="button" class="knowledge-tab is-active" data-kind="status">Unknown Statuses</button>
+        <button type="button" class="knowledge-tab" data-kind="permit_code">Unknown Permit Codes</button>
+        <button type="button" class="knowledge-tab" data-kind="keyword">Unknown Keywords</button>
+      </div>
+
+      <div class="knowledge-filters">
+        <label>Priority tier
+          <select id="filterTier">
+            <option value="">All tiers</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </label>
+        <label>Municipality
+          <select id="filterMuni"><option value="">All municipalities</option></select>
+        </label>
+        <label>Search
+          <input id="filterSearch" type="search" placeholder="raw value or description" />
+        </label>
+        <label>Sort
+          <select id="filterSort">
+            <option value="priority">Priority (high → low)</option>
+            <option value="occurrence">Occurrences</option>
+            <option value="recent">Recent occurrences</option>
+          </select>
+        </label>
+        <button type="button" id="recomputeBtn" class="btn-secondary" title="Recompute priority scores">Recompute priority</button>
+      </div>
+
+      <div class="batch-toolbar" id="batchToolbar">
+        <span><strong id="batchCount">0</strong> selected</span>
+        <label>Proposed mapping
+          <input id="batchMapping" placeholder="e.g. issued" />
+        </label>
+        <label>Confidence
+          <input id="batchConfidence" type="number" min="0" max="100" value="90" />
+        </label>
+        <label>Source
+          <select id="batchSource"></select>
+        </label>
+        <label>Notes
+          <input id="batchNotes" placeholder="optional" />
+        </label>
+        <button type="button" id="batchApproveBtn" class="btn btn-approve">Approve selected</button>
+        <button type="button" id="batchClearBtn" class="btn-secondary">Clear</button>
+      </div>
+
+      <div id="queueList"></div>
+      <div id="emptyState" class="knowledge-empty" hidden>No pending items in this queue.</div>
+      <div id="errorState" class="dashboard-empty" style="display:none;"></div>
+
+      <details class="audit-wrap">
+        <summary>Mapping audit history</summary>
+        <div id="auditContainer"><p class="knowledge-empty">Loading…</p></div>
+      </details>
+    </main>
+  </div>
+  <script src="knowledge.js"></script>
+</body>
+</html>

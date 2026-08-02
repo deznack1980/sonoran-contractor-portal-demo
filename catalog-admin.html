@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Catalog Admin</title>
+  <link rel="stylesheet" href="portal.css" />
+  <style>
+    .admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    @media (max-width:1000px){ .admin-grid { grid-template-columns:1fr; } }
+    .admin-grid .card { padding:16px 18px; margin-bottom:18px; }
+    .admin-grid .card h2 { margin:0 0 12px; font-size:16px; }
+    .field { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; font-size:12.5px; color:var(--text-2); font-weight:600; }
+    .row .field { flex:1; min-width:120px; }
+    .msg { padding:8px 12px; border-radius:8px; margin:8px 0; font-size:13px; }
+    .msg.ok { background:var(--green-bg); color:var(--green); }
+    .msg.err { background:var(--red-bg); color:var(--red); }
+    .counts { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }
+    .counts div { background:var(--surface-2); border-radius:8px; padding:8px; text-align:center; }
+    .counts div b { display:block; font-size:18px; color:var(--gold-strong); }
+    .counts div span { font-size:11px; color:var(--text-3); }
+    table.mini { width:100%; border-collapse:collapse; font-size:12.5px; }
+    table.mini th, table.mini td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <template id="pageContent">
+    <p class="muted" style="margin-top:0">Manage suppliers, upload price files, and configure delivery assumptions.</p>
+    <div class="admin-grid">
+      <div>
+        <div class="card">
+          <h2>Add supplier</h2>
+          <div class="row">
+            <label class="field">Name<input id="supName" placeholder="Acme Supply" /></label>
+            <label class="field">Code<input id="supCode" placeholder="acme" /></label>
+          </div>
+          <div class="row">
+            <label class="field">City<input id="supCity" placeholder="Phoenix" /></label>
+            <label class="field">State<input id="supState" placeholder="AZ" /></label>
+          </div>
+          <div class="row">
+            <label class="field">Latitude<input id="supLat" placeholder="33.4484" /></label>
+            <label class="field">Longitude<input id="supLng" placeholder="-112.0740" /></label>
+          </div>
+          <label class="field">Warehouse address<input id="supAddr" placeholder="Optional" /></label>
+          <button class="btn btn-primary" id="addSupplierBtn">Add supplier</button>
+          <div id="supMsg"></div>
+        </div>
+
+        <div class="card">
+          <h2>Suppliers</h2>
+          <table class="mini" id="suppliersTable">
+            <thead><tr><th>Name</th><th>Code</th><th>Location</th><th>Coords</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Delivery assumptions</h2>
+          <p class="muted" style="font-size:12px">Truck monthly fixed cost is informational only and is not allocated per delivery in V1.</p>
+          <div class="row">
+            <label class="field">Per mile ($)<input id="cfg_delivery_per_mile" /></label>
+            <label class="field">Base fee ($)<input id="cfg_delivery_base_fee" /></label>
+          </div>
+          <div class="row">
+            <label class="field">Min charge ($)<input id="cfg_delivery_min_charge" /></label>
+            <label class="field">Markup (%)<input id="cfg_delivery_markup_pct" /></label>
+          </div>
+          <div class="row">
+            <label class="field">Handling ($)<input id="cfg_delivery_handling_cost" /></label>
+            <label class="field">Road factor<input id="cfg_delivery_road_factor" /></label>
+          </div>
+          <label class="field">Default miles (no coords)<input id="cfg_delivery_default_miles" /></label>
+          <button class="btn btn-primary" id="saveCfgBtn">Save assumptions</button>
+          <div id="cfgMsg"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Upload price catalog</h2>
+          <div class="row">
+            <label class="field">Supplier code<input id="upSupplier" placeholder="sonoran" /></label>
+            <label class="field">Profile
+              <select id="upProfile">
+                <option value="">Auto</option>
+                <option value="sonoran_magento">Sonoran (Magento export)</option>
+                <option value="generic">Generic (map columns)</option>
+              </select>
+            </label>
+          </div>
+          <label class="field">File (CSV or XLSX)<input type="file" id="upFile" accept=".csv,.xlsx,.xlsm" /></label>
+          <div id="mappingArea"></div>
+          <div class="row">
+            <button class="btn" id="previewBtn">Preview</button>
+            <button class="btn btn-primary" id="importBtn" disabled>Approve &amp; import</button>
+          </div>
+          <div id="upMsg"></div>
+          <div id="previewResult"></div>
+        </div>
+
+        <div class="card">
+          <h2>Import history</h2>
+          <table class="mini" id="historyTable">
+            <thead><tr><th>When</th><th>Supplier</th><th>File</th><th>New</th><th>Upd</th><th>Excl</th><th>Fail</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="catalog-admin.js"></script>
+</body>
+</html>

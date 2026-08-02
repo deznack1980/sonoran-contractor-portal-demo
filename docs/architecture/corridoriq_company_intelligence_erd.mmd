@@ -1,0 +1,169 @@
+%% CorridorIQ Company Intelligence ERD (Sprint 4)
+%% PK = primary key, FK = foreign key. Audit/version fields included.
+erDiagram
+    companies ||--o{ company_roles : "has roles"
+    companies ||--o{ contacts : "has contacts"
+    companies ||--o{ company_aliases : "known as"
+    companies ||--|| company_intelligence : "metrics"
+    companies ||--o{ company_activity : "timeline"
+    companies ||--o{ company_match_review_queue : "candidate for"
+    companies ||--o{ company_identity_audit_log : "audited by"
+    companies }o--o{ projects : "linked via role FKs"
+    companies ||--o{ permits : "contractor_company_id"
+    companies ||--o{ companies : "merged_into_id"
+
+    permits ||--|| projects : "one project per permit"
+    projects }o--o| contractors : "legacy contractor_id"
+
+    companies {
+        int id PK
+        string legal_name
+        string display_name
+        string normalized_name "indexed"
+        string dba_name
+        string company_type_primary
+        string license_number "indexed"
+        string license_state
+        string city "indexed"
+        string state "indexed"
+        string source_system "indexed"
+        string source_record_id "indexed"
+        int merged_into_id FK "self, NULL=canonical"
+        string lifecycle_state "active|merged|deprecated"
+        int is_active
+        string first_seen_at
+        string last_seen_at
+        string created_at "audit"
+        string updated_at "audit"
+    }
+
+    company_roles {
+        int id PK
+        int company_id FK
+        string role_type "contractor|developer|owner|..."
+        int is_primary
+        string effective_from
+        string effective_to
+        string source
+        real confidence
+        string created_at "audit"
+        string updated_at "audit"
+    }
+
+    contacts {
+        int id PK
+        int company_id FK
+        string full_name
+        string job_title
+        string email
+        string phone
+        int is_primary
+        string source
+        string source_record_id
+        string created_at "audit"
+        string updated_at "audit"
+    }
+
+    company_aliases {
+        int id PK
+        int company_id FK
+        string alias_name
+        string normalized_alias "indexed"
+        string source
+        string source_record_id
+        string created_at "audit"
+    }
+
+    company_intelligence {
+        int company_id PK "FK companies"
+        int total_permits
+        int active_permits
+        int total_projects
+        int active_projects
+        int projects_last_30_days
+        int commercial_project_count
+        int residential_project_count
+        int municipality_count
+        real average_opportunity_score
+        real highest_opportunity_score
+        real estimated_opportunity_total
+        real permit_growth_90d
+        string activity_trend
+        real company_priority_score "indexed"
+        string company_priority_tier
+        string metrics_calculated_at
+        string model_version "version"
+    }
+
+    company_activity {
+        int id PK
+        int company_id FK
+        string activity_type
+        string activity_date
+        int project_id FK
+        int permit_id FK
+        int contact_id FK
+        string title
+        string dedupe_key "UNIQUE, NULL=user note"
+        int organization_id "NULL=shared (Phase 10)"
+        string created_at "audit"
+    }
+
+    company_match_review_queue {
+        int id PK
+        string source_record_type
+        string source_record_id
+        int candidate_company_id FK
+        string proposed_company_name
+        real match_confidence
+        string match_reasons
+        string conflicting_fields
+        string lifecycle_state "pending|approved|rejected"
+        string reviewed_by
+        string reviewed_at
+        string created_at "audit"
+        string updated_at "audit"
+    }
+
+    company_identity_audit_log {
+        int id PK
+        string action "created|linked|merged|..."
+        int source_company_id
+        int target_company_id
+        string source_record_type
+        string source_record_id
+        string previous_values_json
+        string new_values_json
+        real confidence
+        string performed_by
+        string performed_at "audit"
+    }
+
+    projects {
+        int id PK
+        int permit_id FK "UNIQUE"
+        int contractor_id FK "legacy contractors"
+        int contractor_company_id FK "companies (new)"
+        int owner_company_id FK "companies (new)"
+        int developer_company_id FK "companies (new)"
+        int architect_company_id FK "companies (new)"
+        int engineer_company_id FK "companies (new)"
+        real opportunity_score "unchanged"
+        string project_lifecycle
+        string opportunity_date
+    }
+
+    permits {
+        int id PK
+        string jurisdiction FK
+        string permit_number
+        string general_contractor_name "raw, unchanged"
+        string owner_name "raw, unchanged"
+        string raw_source_json "raw, unchanged"
+        int contractor_company_id FK "companies (new)"
+    }
+
+    contractors {
+        int id PK
+        string normalized_name "UNIQUE (legacy)"
+    }

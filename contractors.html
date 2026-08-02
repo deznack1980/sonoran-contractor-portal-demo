@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CorridorIQ contractor matching: find contractors pulling permits across multiple Arizona jurisdictions, from real ingested permit data." />
+  <title>CorridorIQ — Contractor Matching</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+            <div class="logo-icon">CIQ</div>
+            <div class="logo-text">
+              <p class="title">CorridorIQ</p>
+              <p class="subtitle">Real permit data, before the supply house sees it</p>
+            </div>
+          </a>
+        </div>
+        <nav class="nav-links">
+          <a href="index.html" class="nav-item">Home</a>
+          <a href="dashboard.html" class="nav-item">Dashboard</a>
+          <a href="contractors.html" class="nav-item">Contractor Matching</a>
+          <a href="reports.html?report=qualifying" class="nav-item">Reports</a>
+          <a href="index.html#contact" class="nav-item">Request Leads</a>
+        </nav>
+        <button type="button" class="mobile-menu-toggle" aria-label="Toggle Navigation">&#9776;</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-header">
+        <div>
+          <p class="section-subtitle gold-text" style="margin-bottom:6px;">Cross-jurisdiction intelligence</p>
+          <h1 class="page-title">Contractor matching across jurisdictions</h1>
+          <p class="section-description" style="margin:12px 0 0; max-width:720px;">
+            Contractors who pull permits in more than one connected jurisdiction are expanding into a new
+            market &mdash; a live signal to become their supplier there before a competitor does. Every
+            match below is built from real ingested permit records, matched by contractor name (and license
+            number, where available) across jurisdictions.
+          </p>
+        </div>
+        <p class="dashboard-generated-at" id="generatedAt">Loading data…</p>
+      </div>
+
+      <div id="loadingState" class="dashboard-loading">Loading live data from data/exports/…</div>
+      <div id="errorState" class="dashboard-empty" style="display:none;"></div>
+
+      <div id="matchingContent" style="display:none;">
+        <div class="stat-tile-grid" id="statTileGrid"></div>
+
+        <div class="widget-panel">
+          <h2>Contractor directory</h2>
+          <div class="matching-controls">
+            <input type="text" id="searchInput" class="matching-search" placeholder="Search by contractor name…" />
+            <label class="matching-toggle">
+              <input type="checkbox" id="multiOnlyToggle" checked />
+              Multi-jurisdiction only
+            </label>
+            <span class="dashboard-generated-at" id="resultCount"></span>
+          </div>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="contractorsTable">
+              <thead>
+                <tr>
+                  <th>Contractor</th>
+                  <th>Jurisdictions</th>
+                  <th>Total Permits</th>
+                  <th>Commercial %</th>
+                  <th>Avg Project Value</th>
+                  <th>Growth</th>
+                  <th>Opportunity Rating</th>
+                  <th>Last Permit</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>&copy; 2026 CorridorIQ. Contractor matches are derived from real permit records — see the dashboard for jurisdiction coverage.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="contractors.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Administration</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="page-head">
+      <div>
+        <div class="muted" style="font-size:13px">Organization-wide overview</div>
+      </div>
+      <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="opportunities.html">Review Opportunities</a>
+        <a class="btn btn-sm" href="assignments.html">Assign Work</a>
+        <button class="btn btn-sm btn-primary" id="runRefreshBtn" type="button">Run Morning Refresh</button>
+      </div>
+    </div>
+
+    <div id="refreshCard"></div>
+    <div id="kpis" class="kpi-grid"></div>
+
+    <div class="section-title">Quick actions</div>
+    <div id="actions" class="stack" style="flex-direction:row;flex-wrap:wrap;gap:8px;margin-bottom:18px"></div>
+
+    <div class="section-title">Jurisdiction freshness</div>
+    <div id="freshness"></div>
+
+    <div class="section-title">Recent pipeline activity</div>
+    <div id="pipeline"></div>
+
+    <div class="section-title">Recent opportunity activity</div>
+    <div id="opps"></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="admin-dashboard.js"></script>
+</body>
+</html>

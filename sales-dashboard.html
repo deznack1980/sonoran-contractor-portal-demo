@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Dashboard</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div id="refreshCard"></div>
+
+    <div id="kpis" class="kpi-grid"></div>
+
+    <div class="section-title">Today's priority companies</div>
+    <div id="priority"></div>
+
+    <div class="section-title">Follow-ups due</div>
+    <div id="followups"></div>
+
+    <div class="section-title">Recent opportunity activity</div>
+    <div id="opps"></div>
+
+    <div class="section-title">Your activity (last 30 days)</div>
+    <div id="summary" class="kpi-grid"></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="sales-dashboard.js"></script>
+</body>
+</html>

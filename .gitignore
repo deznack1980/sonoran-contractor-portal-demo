@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local database
+pipeline/db/*.db
+*.db-journal
+
+# Generated exports and reports
+data/exports/
+reports/generated/
+
+# Runtime logs
+logs/
+*.log
+
+# Temp / scratch
+tmp_*.py
+srv_out.log

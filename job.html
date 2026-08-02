@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CorridorIQ polished job brief for a single Arizona permit opportunity." />
+  <title>CorridorIQ — Job Brief</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <header class="header no-print">
+      <div class="header-content">
+        <div class="logo-section">
+          <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+            <div class="logo-icon">CIQ</div>
+            <div class="logo-text">
+              <p class="title">CorridorIQ</p>
+              <p class="subtitle">Real permit data, before the supply house sees it</p>
+            </div>
+          </a>
+        </div>
+        <nav class="nav-links">
+          <a href="index.html" class="nav-item">Home</a>
+          <a href="dashboard.html" class="nav-item">Dashboard</a>
+          <a href="contractors.html" class="nav-item">Contractor Matching</a>
+          <a href="reports.html?report=qualifying&amp;view=polished" class="nav-item">Reports</a>
+          <a href="index.html#contact" class="nav-item">Request Leads</a>
+        </nav>
+        <button type="button" class="mobile-menu-toggle" aria-label="Toggle Navigation">&#9776;</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-header no-print">
+        <div>
+          <p class="section-subtitle gold-text" style="margin-bottom:6px;">Polished job brief</p>
+          <h1 class="page-title" id="pageTitle">Job opportunity</h1>
+          <p class="dashboard-reports-hint" style="margin-top:12px;">
+            <a href="reports.html?report=qualifying&amp;view=polished" class="btn btn-outline">← Back to outreach list</a>
+            <button type="button" class="btn btn-orange" id="printJobBtn" style="margin-left:10px;">Print / PDF</button>
+          </p>
+        </div>
+        <p class="dashboard-generated-at" id="generatedAt"></p>
+      </div>
+
+      <div id="loadingState" class="dashboard-loading no-print">Loading job brief…</div>
+      <div id="errorState" class="dashboard-empty no-print" style="display:none;"></div>
+
+      <article class="report-document" id="jobBrief" style="display:none;">
+        <header class="report-document-header no-print">
+          <div>
+            <span class="report-doc-badge" id="jobBadge">Job brief</span>
+            <h2 class="report-doc-heading" id="jobHeading">Permit</h2>
+            <p class="report-doc-submeta" id="jobSubmeta"></p>
+          </div>
+        </header>
+        <div class="report-document-body" id="jobBody"></div>
+        <footer class="report-document-footer no-print">
+          Live public-permit data only — CorridorIQ does not fabricate contractor or score fields.
+        </footer>
+      </article>
+    </main>
+
+    <footer class="site-footer no-print">
+      <p>&copy; 2026 CorridorIQ. Job briefs regenerate with <code class="path-code">python pipeline/run.py reports</code>.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="job.js"></script>
+</body>
+</html>

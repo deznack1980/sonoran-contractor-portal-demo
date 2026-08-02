@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CorridorIQ company profile: intelligence metrics, opportunities, and timeline." />
+  <title>CorridorIQ — Company Profile</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media (max-width: 900px) { .profile-grid { grid-template-columns:1fr; } }
+    .kv { display:grid; grid-template-columns:180px 1fr; gap:6px 12px; font-size:14px; }
+    .kv dt { color:#94a3b8; }
+    .kv dd { margin:0; }
+    .metric-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+    .metric-card { background:#12151c; border:1px solid #232838; border-radius:10px; padding:12px 14px; }
+    .metric-card .val { font-size:22px; font-weight:700; }
+    .metric-card .lbl { font-size:12px; color:#94a3b8; margin-top:2px; }
+    .role-chip { display:inline-block; background:#1e293b; color:#cbd5e1; padding:2px 8px; border-radius:6px; font-size:12px; margin:2px; }
+    .alias-chip { display:inline-block; background:#0f172a; color:#93c5fd; padding:2px 8px; border-radius:6px; font-size:12px; margin:2px; }
+    .timeline { list-style:none; margin:0; padding:0; }
+    .timeline li { padding:8px 0; border-bottom:1px solid #1f2430; font-size:14px; display:flex; gap:12px; }
+    .timeline .date { color:#94a3b8; min-width:96px; }
+    .tier-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:600; }
+    .tier-Critical { background:#7f1d1d; color:#fecaca; } .tier-High { background:#7c2d12; color:#fed7aa; }
+    .tier-Medium { background:#78350f; color:#fde68a; } .tier-Low { background:#334155; color:#cbd5e1; }
+    .dq-flag { color:#f59e0b; }
+    .back-link { color:#93c5fd; text-decoration:none; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+            <div class="logo-icon">CIQ</div>
+            <div class="logo-text">
+              <p class="title">CorridorIQ</p>
+              <p class="subtitle">Company Profile</p>
+            </div>
+          </a>
+        </div>
+        <nav class="nav-links">
+          <a href="dashboard.html" class="nav-item">Dashboard</a>
+          <a href="companies.html" class="nav-item">Companies</a>
+          <a href="reports.html?report=qualifying" class="nav-item">Reports</a>
+        </nav>
+        <button type="button" class="mobile-menu-toggle" aria-label="Toggle Navigation">&#9776;</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <p style="margin:0 0 12px;"><a class="back-link" href="companies.html">&larr; Back to companies</a></p>
+      <div class="dashboard-header">
+        <div>
+          <h1 class="page-title" id="companyName">Loading…</h1>
+          <p class="section-description" id="companySub" style="margin:8px 0 0;"></p>
+        </div>
+        <p class="dashboard-generated-at" id="apiStatus"></p>
+      </div>
+
+      <div id="errorState" class="dashboard-empty" style="display:none;"></div>
+
+      <div id="profileContent" style="display:none;">
+        <!-- Intelligence metric cards -->
+        <div class="widget-panel">
+          <h2>Intelligence</h2>
+          <div class="metric-grid" id="metricGrid"></div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="widget-panel">
+            <h2>Overview</h2>
+            <dl class="kv" id="overviewKv"></dl>
+            <div style="margin-top:12px;"><strong>Roles:</strong> <span id="rolesBox"></span></div>
+            <div style="margin-top:8px;"><strong>Aliases:</strong> <span id="aliasesBox"></span></div>
+            <div style="margin-top:8px;"><strong>Contacts:</strong> <span id="contactsBox"></span></div>
+          </div>
+          <div class="widget-panel">
+            <h2>Data quality</h2>
+            <dl class="kv" id="dqKv"></dl>
+          </div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Current opportunities</h2>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="opportunitiesTable">
+              <thead><tr>
+                <th>Permit</th><th>City</th><th>Category</th><th>Lifecycle</th>
+                <th>Score</th><th>Opportunity date</th><th>Timing</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Timeline</h2>
+          <ul class="timeline" id="timelineList"></ul>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>&copy; 2026 CorridorIQ. Profile data is derived from real permit records. No AI-generated summaries.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="company-profile.js"></script>
+</body>
+</html>

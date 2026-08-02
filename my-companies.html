@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — My Companies</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="chips" id="views"></div>
+    <div class="filters">
+      <input type="search" id="fq" placeholder="Search name or city…" />
+      <select id="fstatus"><option value="">All statuses</option></select>
+      <select id="ftier">
+        <option value="">All priorities</option>
+        <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+      </select>
+      <input type="text" id="fmuni" placeholder="Municipality…" style="max-width:170px" />
+      <select id="ffollowup">
+        <option value="">Any follow-up</option>
+        <option value="due">Follow-up due</option>
+        <option value="overdue">Overdue</option>
+      </select>
+      <select id="fcontacted">
+        <option value="">Contacted: any</option>
+        <option value="never">Never contacted</option>
+        <option value="yes">Previously contacted</option>
+      </select>
+      <select id="frep" style="display:none"><option value="">All reps</option></select>
+      <button class="btn btn-ghost btn-sm" id="fclear">Clear</button>
+    </div>
+    <div id="list"></div>
+    <div class="pager" id="pager"></div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="my-companies.js"></script>
+</body>
+</html>

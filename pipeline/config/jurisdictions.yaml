@@ -1,0 +1,281 @@
+# CorridorIQ jurisdiction registry.
+#
+# status: 'connected' only after a real, working public data source has been
+# verified live (not assumed from a city having *a* website). Everything else
+# is 'pending' with a documented reason in `notes`. Never flip a jurisdiction
+# to 'connected' without a verified endpoint_url + resource_id that actually
+# returns real records.
+
+jurisdictions:
+  - slug: mesa_az
+    name: Mesa
+    state: AZ
+    status: connected
+    connector_type: socrata
+    endpoint_url: https://data.mesaaz.gov
+    resource_id: m2kk-w2hz
+    notes: >
+      Verified live Socrata SODA API (data.mesaaz.gov, resource m2kk-w2hz).
+      Confirmed fields include permit_number, permit_type, status,
+      description_of_work, issued_date, finaled_date, property_address,
+      parcel_number, icc_value, total_square_feet, contractor_name,
+      contractor_address, new_residential_permit, latitude/longitude.
+
+  - slug: phoenix_az
+    name: Phoenix
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1
+    resource_id: "1"
+    notes: >
+      CORRECTED from prior pending assessment. City of Phoenix publishes a
+      public Planning_Permit MapServer layer 1 ("Permits") on
+      maps.phoenix.gov/pub — verified 2026-07-14: ~71,263 individual
+      permits with PER_NUM, PER_TYPE/PER_TYPE_DESC, PERMIT_STAT,
+      PER_ENT_DATE / PER_ISSUE_DATE / PER_EXPIRE_DATE / PER_COMPL_DATE,
+      STREET_FULL_NAME, PROFESS_NAME (company), SCOPE_DESC / MOD_DESC /
+      PERMIT_NAME. Issue dates through 2026-07-13; ~55k issued since
+      2024-01-01. TIMESTAMP filters on PER_ISSUE_DATE work for incremental
+      ingest. Earlier false leads: HUD/SOCDS aggregates on phoenixopendata,
+      PDD Online session postbacks, and a Phoenix OR FeatureServer.
+      GAP: no valuation or square-footage fields on this layer. NOTE:
+      PROFESS_NAME can be placeholders (OWNER, TO BE BID) as well as real
+      contractor companies.
+
+  - slug: scottsdale_az
+    name: Scottsdale
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12
+    resource_id: "12"
+    notes: >
+      CORRECTED from an earlier pending assessment. Scottsdale's Accela
+      Citizen Access / Scottsdale SPUR portal is indeed a search UI with no
+      public API — but a SEPARATE open-data feature table ("Planning and
+      Development Building Permits", owned by City_Of_Scottsdale on ArcGIS
+      Online) has verified real, current individual permit records
+      including owner name, builder/responsible-party name, valuation,
+      square footage, and address. ~288,000 total records, ~20,400 since
+      2024-01-01. Found via ArcGIS-org content search, same technique used
+      for Tempe/Gilbert.
+      No AccelaConnector implemented; scraping a stateful search UI is
+      fragile and may raise ToS concerns.
+
+  - slug: tempe_az
+    name: Tempe
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0
+    resource_id: "0"
+    notes: >
+      Verified live ArcGIS FeatureServer ("Permits Issued by Building
+      Safety", Tempe's own org). Confirmed real, current individual permit
+      records (including one issued 2 days before verification) with
+      permit number, type, status, description, project name, applied/
+      issued/expiration/completed dates, full address, lat/long, estimated
+      project cost, square footage, and contractor company name/license
+      number. ~19,800 total records, ~6,900 since 2024-01-01.
+
+  - slug: chandler_az
+    name: Chandler
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/DSActiveProjects/MapServer/18
+    resource_id: "18"
+    notes: >
+      CORRECTED from the earlier pending assessment, which only searched
+      Chandler's ArcGIS Online org content index (share-open-data-changis.hub.arcgis.com)
+      and found nothing but aggregate KPI dashboards. That index doesn't
+      surface it, but Chandler's own ArcGIS Server (gis.chandleraz.gov,
+      no relation to the Hub org above) has an anonymous-access
+      /appsanonymous/rest/services tree with a real, individual-record
+      "DSActiveProjects" MapServer (Accela-fed) under the DevelopmentServices
+      folder. Layer 18 "Under Construction" holds BLD (building) permits
+      with project name, address, permit type, issued date, job value,
+      square footage — confirmed real records, ~170, dates through
+      ~2025-10-17. Sibling layers in the same MapServer (19 "Approved
+      Projects" = CIV site-plan permits, 20 "Pre-Tech", 22 "Completed
+      Projects") exist if broader coverage is wanted later.
+      SCOPE GAP: this covers only BLD (new construction/additions/remodels
+      requiring a structural permit) — routine trade-only permits
+      (plumbing/electrical/mechanical) are not in this feed at all, unlike
+      Mesa/Tempe/Gilbert. SCOPE GAP: no filed/applied date field exists here
+      (same gap as Mesa) — only issued_date and a certificate-of-occupancy
+      date. GAP: no contractor-identity field found in this layer.
+      NOTE 2026-07-14: live queries against layer 18 (and siblings 19/20/22)
+      currently return Esri 400 "Unable to complete operation." Prior ingested
+      Chandler rows remain in the DB; reconnect refreshes will succeed when
+      Chandler's MapServer recovers.
+
+  - slug: peoria_az
+    name: Peoria
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3
+    resource_id: "3"
+    notes: >
+      CORRECTED from the earlier pending assessment (which only checked
+      devservices.peoriaaz.gov, the Accela Citizen Access search UI with no
+      public API). Peoria's own ArcGIS Server (gis.peoriaaz.gov) publishes
+      an Accela-fed "Peoria_Building_Permit_All" FeatureServer, layer 3
+      ("Building Permits") — found by walking the server's folder tree the
+      same way Chandler was. This is the richest source verified in this
+      pass: real filed AND issued dates (B1_FILE_DD / IssDate) with genuine
+      variance, applicant/contractor name and organization, project status,
+      general permit scope (not narrowed to one permit type). Confirmed
+      live and current — issue dates through the day of verification
+      (2026-07-04).
+      GAP: no valuation/job-value field exists on this layer. NOTE: the
+      source's own `calcDays` field does NOT reliably equal
+      IssDate - B1_FILE_DD in sample records — its real meaning wasn't
+      determined, so the connector does not map it; approval_days should be
+      computed downstream from filed_date/issued_date instead.
+
+  - slug: gilbert_az
+    name: Gilbert
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3
+    resource_id: "3"
+    notes: >
+      Verified live ArcGIS FeatureServer table ("EnergovPermitData", Gilbert's
+      own org). Confirmed real, current individual permit records (issued
+      dates through the verification date) with permit number, type, work
+      class, status, valuation, full address, parcel number, apply/issued/
+      final dates. ~214,000 total records, ~14,800 since 2024-01-01. GAP:
+      no contractor-identity field exists in this source at all — every
+      Gilbert permit has NULL contractor name (not fabricated, genuinely
+      absent). Also found some records with Latitude/Longitude in a
+      projected coordinate system instead of WGS84 degrees — the connector
+      nulls those out rather than storing obviously-wrong coordinates.
+
+  - slug: glendale_az
+    name: Glendale
+    state: AZ
+    status: pending
+    connector_type: null
+    endpoint_url: null
+    resource_id: null
+    notes: >
+      Glendale's ArcGIS org (glendaleaz-cog-gis.hub.arcgis.com) still has no
+      building-permit open-data table — public "Permit Reports" on the city
+      site are aggregate PDFs only.
+      RE-CHECKED 2026-07-14: city GIS tree at
+      gismaps.glendaleaz.com/gisserver/rest/services is reachable. Folder
+      Building_Safety (and BuildingPlan) return Token Required (499) —
+      not anonymously queryable. Public OpenData/SmartGov folders expose
+      parcels, business licenses, streets, crime — no per-permit building
+      layer. Planning_Development_Sites remains annexation polygons, not
+      individual building permits. Hub search only hits Building Footprints
+      (building outlines), not permits. City "Permit Reports" remain
+      aggregate PDFs. Stays pending.
+
+  - slug: surprise_az
+    name: Surprise
+    state: AZ
+    status: pending
+    connector_type: null
+    endpoint_url: null
+    resource_id: null
+    notes: >
+      Surprise Hub still has no per-permit building-permit dataset.
+      RE-CHECKED 2026-07-14: DCAT feed for data-surprise.opendata.arcgis.com
+      has zero titles/descriptions mentioning permits. DNS for
+      gis.surpriseaz.gov and maps.surpriseaz.gov does not resolve.
+      Closest Hub dataset is "City of Surprise Developments"
+      (FeatureServer) — 123 PAD/subdivision polygons with project name/
+      status/acres/DUs, not individual building permits. gis.cityofsurprise.com
+      closes the connection. Monthly "Permits Issued" CivicPlus PDFs exist
+      but are not a stable queryable API. Accela Citizen Access (TOS) is
+      search-UI only. Stays pending.
+
+  - slug: goodyear_az
+    name: Goodyear
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://maps.goodyearaz.gov/server/rest/services/Accela/Construction_Permits/MapServer/0
+    resource_id: "0"
+    notes: >
+      CORRECTED from prior pending assessment. Goodyear publishes a public
+      Accela-fed Construction_Permits MapServer layer 0 on
+      maps.goodyearaz.gov (nightly sync). Verified 2026-07-14: ~245
+      individual permits with PermitId, PermitDate, GenConName + license,
+      OwnerName, PermitValue, FullAddress, JobDescription, sqft.
+      ~238/245 rows carry contractor name. SCOPE: Accela construction / TI
+      oriented (smaller than Mesa/Tempe trade-wide feeds). Full refresh
+      each ingest (PermitDate string dates do not accept TIMESTAMP filters
+      reliably).
+
+  - slug: avondale_az
+    name: Avondale
+    state: AZ
+    status: pending
+    connector_type: null
+    endpoint_url: null
+    resource_id: null
+    notes: >
+      Avondale primarily uses Accela Citizen Access for permits (no public
+      JSON API). Earlier web-search "Planning and Development Building
+      Permits" hits were Scottsdale's open-data table, not Avondale's.
+      RE-CHECKED 2026-07-14: gisx.avondaleaz.gov/arcgispublic/rest/services
+      returned HTTP 522 from this environment (previously 403).
+      RE-CHECKED later 2026-07-14: gisweb.avondaleaz.gov/server is
+      reachable and lists an Accela folder, but Accela (and several other
+      folders) return Token Required (499). Public Planning/Active_Developments
+      and DevelopmentProgress are development-project basemap layers, not
+      individual building permits. Accela Citizen Access remains the
+      interactive UI only. Stays pending.
+
+  - slug: buckeye_az
+    name: Buckeye
+    state: AZ
+    status: connected
+    connector_type: arcgis_hub
+    endpoint_url: https://maps.buckeyeaz.gov/server/rest/services/Hosted/EnergovPermitswReviewHistory2/FeatureServer/0
+    resource_id: "0"
+    notes: >
+      CORRECTED from prior pending assessment. Buckeye publishes a public
+      hosted EnerGov permits FeatureServer on maps.buckeyeaz.gov
+      (Hosted/EnergovPermitswReviewHistory2 layer 0 "EnergovPermits").
+      Verified 2026-07-14: ~50,895 individual permits with permitnumber,
+      permittype/workclass (incl. Plumbing - Residential), permitstatus,
+      apply/issue/expire/finalize dates, value, squarefeet, parcel, and
+      address fields when populated. Issue dates through 2026-07-10;
+      ~16k issued since 2024-01-01; TIMESTAMP filters on issuedate work.
+      Earlier Hub DCAT / gis.buckeyeaz.gov DNS dead ends were real — the
+      live feed lives on maps.buckeyeaz.gov Hosted services instead.
+      GAP: no contractor-identity field on this layer. NOTE: many recent
+      rows have blank/whitespace situs and addressline fields.
+
+  - slug: queen_creek_az
+    name: Queen Creek
+    state: AZ
+    status: pending
+    connector_type: null
+    endpoint_url: null
+    resource_id: null
+    notes: >
+      Queen Creek's ArcGIS org (queen-creek-open-data-qcgis.hub.arcgis.com,
+      org t16ZiY9Utsg4bsyA) was searched directly — only result was a
+      Parcels dataset, no permit data. Queen Creek's real permit system is
+      the "Development Nexus" portal plus Accela Citizen Access — no public
+      API found.
+      RE-CHECKED 2026-07-09: pulled the full DCAT feed for
+      queen-creek-open-data-qcgis.hub.arcgis.com directly (15 datasets:
+      addresses, voting districts, parks/rec facilities, trails, zip codes,
+      general plan, zoning, water/sewer service areas, subdivisions,
+      annexation) — none titled or scoped as permits.
+      RE-CHECKED 2026-07-14: Hub DCAT still has no permit datasets;
+      maps.queencreekaz.gov and gis.queencreekaz.gov fail to connect
+      (connection reset). Found live GIS at qcmaps.queencreek.org —
+      Accela/Accela MapServer and OpenData folders are reference layers
+      only (addresses, parcels, zoning, PADs), with no permit-record
+      feature table. Permit workflow remains Development Nexus /
+      Accela Citizen Access (aca-prod.accela.com/QC) only. Stays pending.

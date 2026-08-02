@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Live CorridorIQ dashboard: real Arizona construction permit data, opportunity scoring, and contractor activity." />
+  <title>CorridorIQ — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .lifecycle-controls { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 14px; }
+    .lifecycle-views { display: flex; flex-wrap: wrap; gap: 6px; }
+    .lifecycle-view { border: 1px solid #c9c2b4; background: #fff; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 0.85rem; color: #2c2a26; border-radius: 4px; }
+    .lifecycle-view.is-active { background: #1f4e79; color: #fff; border-color: #1f4e79; }
+    .lifecycle-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+    .lifecycle-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #c9c2b4; background: #f7f4ee; padding: 4px 10px; border-radius: 14px; cursor: pointer; font-size: 0.82rem; user-select: none; }
+    .lifecycle-chip.is-on { background: #2e75b6; color: #fff; border-color: #2e75b6; }
+    .timing-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.76rem; font-weight: 700; color: #fff; }
+    .timing-Excellent { background: #1b7a3a; }
+    .timing-Good { background: #2e75b6; }
+    .timing-Moderate { background: #b07d18; }
+    .timing-Late { background: #b5561f; }
+    .timing-Historical { background: #767268; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+            <div class="logo-icon">CIQ</div>
+            <div class="logo-text">
+              <p class="title">CorridorIQ</p>
+              <p class="subtitle">Real permit data, before the supply house sees it</p>
+            </div>
+          </a>
+        </div>
+        <nav class="nav-links">
+          <a href="index.html" class="nav-item">Home</a>
+          <a href="companies.html" class="nav-item">Companies</a>
+          <a href="contractors.html" class="nav-item">Contractor Matching</a>
+          <a href="reports.html?report=qualifying" class="nav-item">Reports</a>
+          <a href="knowledge.html" class="nav-item">Knowledge Review</a>
+          <a href="index.html#plumbing" class="nav-item">Plumbing Permits</a>
+          <a href="index.html#contact" class="nav-item">Request Leads</a>
+        </nav>
+        <button type="button" class="mobile-menu-toggle" aria-label="Toggle Navigation">&#9776;</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-header">
+        <div>
+          <p class="section-subtitle gold-text" style="margin-bottom:6px;">Live dashboard</p>
+          <h1 class="page-title">Arizona construction &amp; plumbing permit intelligence</h1>
+          <p class="dashboard-reports-hint">
+            <a href="reports.html?report=qualifying&amp;view=polished" class="btn btn-orange" style="margin-right:10px;">
+              Open polished qualifying brief
+            </a>
+            <a href="dashboard.html" class="inline-link">Stay on dashboard</a>
+            <span class="text-muted"> · files in </span>
+            <code class="path-code">reports/generated/</code>
+          </p>
+        </div>
+        <p class="dashboard-generated-at" id="generatedAt">Loading data…</p>
+      </div>
+
+      <div id="loadingState" class="dashboard-loading">Loading live data from data/exports/…</div>
+      <div id="errorState" class="dashboard-empty" style="display:none;"></div>
+
+      <div id="dashboardContent" style="display:none;">
+        <div class="stat-tile-grid" id="statTileGrid"></div>
+
+        <div class="widget-panel">
+          <h2>Jurisdiction coverage</h2>
+          <div class="jurisdiction-grid" id="jurisdictionGrid"></div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Projects by category</h2>
+          <div class="category-breakdown-grid" id="categoryGrid"></div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>High opportunity projects</h2>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="highOpportunityTable">
+              <thead>
+                <tr>
+                  <th>Score</th>
+                  <th>Permit</th>
+                  <th>City</th>
+                  <th>Category</th>
+                  <th>Contractor</th>
+                  <th>Est. Material Value</th>
+                  <th>Likely Scope</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Project lifecycle pipeline</h2>
+          <p class="dashboard-generated-at" style="margin-top:-6px;">
+            Earliest-opportunity tracking — includes submitted projects before they are issued.
+          </p>
+          <div class="lifecycle-controls" id="lifecycleControls">
+            <div class="lifecycle-views" id="lifecycleViews">
+              <button type="button" class="lifecycle-view is-active" data-view="all">All</button>
+              <button type="button" class="lifecycle-view" data-view="earliest">Earliest Opportunities</button>
+              <button type="button" class="lifecycle-view" data-view="issued_today">Issued Today</button>
+              <button type="button" class="lifecycle-view" data-view="construction">Entering Construction</button>
+              <button type="button" class="lifecycle-view" data-view="followup">Awaiting Follow-up</button>
+            </div>
+            <div class="lifecycle-filters" id="lifecycleFilters"></div>
+          </div>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="lifecycleTable">
+              <thead>
+                <tr>
+                  <th>Lifecycle</th>
+                  <th>Timing</th>
+                  <th>Opportunity date</th>
+                  <th>Age</th>
+                  <th>Permit</th>
+                  <th>City</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Recent permits (last 30 days)</h2>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="recentPermitsTable">
+              <thead>
+                <tr>
+                  <th>Issued</th>
+                  <th>Permit</th>
+                  <th>City</th>
+                  <th>Category</th>
+                  <th>Score</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="widget-panel">
+          <h2>Recent contractor activity</h2>
+          <div class="data-table-wrapper">
+            <table class="data-table" id="contractorsTable">
+              <thead>
+                <tr>
+                  <th>Contractor</th>
+                  <th>Permits</th>
+                  <th>Commercial %</th>
+                  <th>Avg Project Value</th>
+                  <th>Growth</th>
+                  <th>Opportunity Rating</th>
+                  <th>Last Permit</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>&copy; 2026 CorridorIQ. Data sourced from public jurisdiction permit records — see jurisdiction coverage above for what's live.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
