@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Material List Intake</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="page-head">
+      <div>
+        <div class="muted" style="font-size:13px">Create a clean bill of materials from a contractor request</div>
+      </div>
+      <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="opportunity-board.html">Back to Pipeline</a>
+        <button class="btn btn-sm btn-primary" id="saveDraftBtn" type="button">Save Draft</button>
+      </div>
+    </div>
+
+    <div class="grid-cards" style="grid-template-columns:minmax(320px,.85fr) minmax(460px,1.6fr);align-items:start">
+      <section class="card card-pad">
+        <div class="section-title" style="margin-top:0">Request details</div>
+        <div class="stack" style="gap:12px">
+          <label class="fld">Contractor / company<input id="companyName" placeholder="Select or enter contractor" /></label>
+          <label class="fld">Project / job address<input id="projectName" placeholder="Project name or job address" /></label>
+          <label class="fld">Needed by<input id="neededBy" type="date" /></label>
+          <label class="fld">Delivery preference<select id="deliveryPreference"><option value="delivery">Delivery</option><option value="pickup">Will call / pickup</option><option value="either">Best available option</option></select></label>
+          <label class="fld">Notes<textarea id="requestNotes" placeholder="Brands, alternates, delivery restrictions, site contact…"></textarea></label>
+        </div>
+
+        <div class="section-title">Upload source</div>
+        <label id="dropZone" class="card" style="padding:26px;border-style:dashed;text-align:center;cursor:pointer;display:block">
+          <input id="sourceFile" type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp" hidden />
+          <div style="font-size:28px;margin-bottom:6px">⇧</div>
+          <div style="font-weight:700">Drop a material list here</div>
+          <div class="muted" style="font-size:12px;margin-top:5px">PDF, Excel, CSV, photo, or screenshot</div>
+          <div id="fileName" class="badge blue" style="display:none;margin-top:12px"></div>
+        </label>
+
+        <div class="section-title">Source actions</div>
+        <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
+          <button id="parseBtn" class="btn btn-primary" type="button">Parse Material List</button>
+          <button id="clearBtn" class="btn" type="button">Clear</button>
+        </div>
+        <div id="intakeStatus" style="margin-top:12px"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>Bill of Materials</h2>
+            <div class="muted" style="font-size:12px">Review every line before pricing</div>
+          </div>
+          <button class="btn btn-sm" id="addRowBtn" type="button">+ Add Item</button>
+        </div>
+        <div class="table-wrap" style="border:0;border-radius:0">
+          <table class="tbl responsive" id="bomTable">
+            <thead><tr><th style="width:78px">Qty</th><th>Description</th><th style="width:120px">Unit</th><th style="width:160px">Manufacturer</th><th style="width:80px"></th></tr></thead>
+            <tbody id="bomBody"></tbody>
+          </table>
+        </div>
+        <div class="card-pad" style="border-top:1px solid var(--border)">
+          <div class="cc-meta" style="margin-bottom:14px">
+            <div><span>Line items</span><strong id="lineCount">0</strong></div>
+            <div><span>Total quantity</span><strong id="qtyCount">0</strong></div>
+            <div><span>Pricing supplier</span><strong>Sonoran Plumbing Supply</strong></div>
+            <div><span>Status</span><strong id="bomStatus">Draft</strong></div>
+          </div>
+          <div class="stack" style="flex-direction:row;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="requestReviewBtn" type="button">Submit for Review</button>
+            <button class="btn btn-primary" id="priceBtn" type="button">Price with Sonoran</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="material-list-intake.js"></script>
+</body>
+</html>
