@@ -66,10 +66,14 @@
   function render() {
     const q = document.getElementById("boardSearch").value.trim().toLowerCase();
     const minScore = Number(document.getElementById("boardScore").value || 60);
+    const owner = document.getElementById("boardOwner").value;
+    const userId = CIQ.user && (CIQ.user.id || CIQ.user.user_id);
     const filtered = items.filter((p) => {
       const haystack = [p.display_name, p.job_address, p.permit_number, p.jurisdiction, p.city]
         .filter(Boolean).join(" ").toLowerCase();
-      return Number(p.opportunity_score || 0) >= minScore && (!q || haystack.includes(q));
+      const assignedId = p.assigned_user_id || p.assigned_to_user_id || p.owner_user_id || p.user_id;
+      const isMine = !owner || (userId != null && String(assignedId) === String(userId));
+      return Number(p.opportunity_score || 0) >= minScore && (!q || haystack.includes(q)) && isMine;
     });
 
     renderSummary(filtered);
