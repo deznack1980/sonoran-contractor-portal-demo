@@ -310,6 +310,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         # --- reports ---
         if path == "/api/reports/catalog":
             return self._json(200, reports_catalog.catalog(conn, user))
+        if path == "/api/reports/company-opportunities":
+            return self._json(200, reports_catalog.company_opportunity_report(conn, user))
         if path == "/api/reports/download":
             from pipeline.auth.rbac import require_permission
             require_permission(user, "reports.view")
