@@ -1,0 +1,34 @@
+name: Launch smoke checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - chatgpt/contractor-crm-launch
+      - cursor/morning-refresh-and-login-fix
+
+jobs:
+  static-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          find . -maxdepth 2 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Verify local page assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          missing = []
+          for page in Path('.').glob('*.html'):
+              text = page.read_text(encoding='utf-8')
+              for ref in re.findall(r'''(?:src|href)=["']([^"'?#]+)''', text):
+                  if ref.startswith(('http://', 'https://', '/', '#', 'mailto:', 'tel:')):
+                      continue
+                  if not Path(ref).exists():
+                      missing.append(f"{page}: {ref}")
+          if missing:
+              raise SystemExit("Missing local assets:\n" + "\n".join(missing))
+          print("All local HTML assets are present.")
+          PY
