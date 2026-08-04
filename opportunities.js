@@ -1,6 +1,6 @@
 /* Opportunities — high-scoring projects across assigned companies. */
 (function () {
-  let page = 1; const filters = {}; let canEdit = false;
+  let page = 1; const filters = { age_days: "365" }; let canEdit = false;
 
   function truncate(s, n) { s = s || ""; return s.length > n ? s.slice(0, n) + "…" : s; }
 
@@ -69,7 +69,7 @@
 
   document.addEventListener("DOMContentLoaded", async () => {
     const user = await CIQ.guard("projects.view_assigned",
-      { title: "Opportunities", subtitle: "Projects that created the opening", active: "opportunities.html" });
+      { title: "Project Records", subtitle: "Permit-backed projects with clear source age", active: "opportunities.html" });
     if (!user) return;
     canEdit = CIQ.hasPerm("crm.activities.create");
     const lc = document.getElementById("flifecycle");
@@ -80,6 +80,7 @@
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
     lc.addEventListener("change", () => { filters.lifecycle = lc.value; page = 1; load(); });
     document.getElementById("fscore").addEventListener("change", (e) => { filters.score_min = e.target.value; page = 1; load(); });
+    document.getElementById("fage").addEventListener("change", (e) => { filters.age_days = e.target.value; page = 1; load(); });
     load();
   });
 })();
