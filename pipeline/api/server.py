@@ -55,9 +55,10 @@ _PORTAL_PAGES = {
     "product-search.html", "product-search.js", "quote-compare.html",
     "quote-compare.js", "catalog-admin.html", "catalog-admin.js",
     # Sales workspace redesign pages.
-    "opportunities.html", "opportunities.js", "activity.html", "activity.js",
-    "reports.html", "reports.js", "assignments.html", "assignments.js",
-    "portal.css",
+    "opportunities.html", "opportunities.js", "opportunity-board.html",
+    "opportunity-board.js", "opportunity-board.css", "material-list-intake.html",
+    "material-list-intake.js", "activity.html", "activity.js", "reports.html",
+    "reports.js", "assignments.html", "assignments.js", "portal.css",
 }
 
 _ID = r"(\d+)"
