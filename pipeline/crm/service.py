@@ -860,6 +860,17 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     if smin not in (None, ""):
         where.append("COALESCE(pr.opportunity_score,0) >= ?")
         params.append(float(smin))
+    age_days = filters.get("age_days")
+    if age_days not in (None, ""):
+        try:
+            days = max(1, min(int(age_days), 3650))
+            where.append(
+                "date(COALESCE(pr.opportunity_date, p.last_updated_at, p.issued_date, p.first_seen_at)) "
+                ">= date('now', ?)"
+            )
+            params.append(f"-{days} days")
+        except (TypeError, ValueError):
+            pass
 
     where_sql = " AND ".join(where)
     total = conn.execute(
