@@ -2,18 +2,21 @@
 (function () {
   let data = null;
 
-  const KPI_DEFS = [
-    ["total_companies", "Total companies", "⌂", "my-companies.html", ""],
-    ["total_projects", "Total projects", "▦", "opportunities.html", ""],
-    ["total_permits", "Total permits", "☰", "opportunities.html", ""],
-    ["new_submitted_opportunities", "New submitted", "◎", "opportunities.html", "good"],
-    ["new_issued_permits", "New issued", "✓", "opportunities.html", "good"],
-    ["high_priority_opportunities", "High-priority", "⚡", "my-companies.html?tier=Critical", "warn"],
-    ["companies_awaiting_assignment", "Awaiting assignment", "⇄", "assignments.html", "warn"],
-    ["estimates_awaiting_review", "Estimates awaiting review", "$", "estimator-work-queue.html", ""],
-    ["estimates_approved_for_supplier", "Approved for supplier", "⬡", "product-search.html", ""],
-    ["active_employees", "Active employees", "⦿", "user-management.html", ""],
-    ["overdue_team_tasks", "Overdue team tasks", "⚠", "team-dashboard.html", "alert"],
+  const PRIMARY_KPIS = [
+    ["new_submitted_opportunities", "New submitted today", "◎", "opportunity-board.html", "good", "Fresh permit applications worth reviewing"],
+    ["new_issued_permits", "New permits issued", "✓", "opportunity-board.html", "good", "Projects moving into purchasing windows"],
+    ["high_priority_opportunities", "High-priority targets", "⚡", "opportunity-board.html", "warn", "Best active revenue opportunities"],
+    ["companies_awaiting_assignment", "Need an owner", "⇄", "assignments.html", "warn", "Companies waiting for sales follow-up"],
+  ];
+
+  const SECONDARY_KPIS = [
+    ["total_companies", "Companies", "⌂", "my-companies.html"],
+    ["total_projects", "Projects", "▦", "opportunities.html"],
+    ["total_permits", "Permit records", "☰", "opportunities.html"],
+    ["estimates_awaiting_review", "Estimate queue", "$", "estimator-work-queue.html"],
+    ["estimates_approved_for_supplier", "Material lines", "⬡", "product-search.html"],
+    ["active_employees", "Active users", "⦿", "user-management.html"],
+    ["overdue_team_tasks", "Overdue tasks", "⚠", "team-dashboard.html"],
   ];
 
   const ACTIONS = [
@@ -42,18 +45,27 @@
 
   function renderKpis() {
     const k = data.kpis || {};
-    document.getElementById("kpis").innerHTML = KPI_DEFS.map(([key, label, ico, href, cls]) => {
-      const v = k[key] || 0;
-      const hint = kpiEmptyHint(key, v);
-      const alertCls = (key === "overdue_team_tasks" && v > 0) ? "alert"
-        : (key === "companies_awaiting_assignment" && v > 0) ? "warn" : cls;
-      return `<a class="kpi ${alertCls}" href="${href}" title="${CIQ.esc(hint || label)}">
-        <span class="kpi-ico">${ico}</span>
-        <div class="kpi-val">${v}</div>
-        <div class="kpi-label">${label}</div>
-        ${hint ? `<div class="muted" style="font-size:11px;margin-top:4px">${CIQ.esc(hint)}</div>` : ""}
-      </a>`;
-    }).join("");
+    document.getElementById("primaryKpis").innerHTML = PRIMARY_KPIS.map(
+      ([key, label, ico, href, cls, context]) => {
+        const value = Number(k[key] || 0);
+        const zero = value === 0 ? " zero" : "";
+        return `<a class="priority-card ${cls}${zero}" href="${href}">
+          <div class="priority-top"><span class="priority-ico">${ico}</span>
+            <span class="priority-arrow">→</span></div>
+          <div class="priority-value">${value.toLocaleString()}</div>
+          <div class="priority-label">${CIQ.esc(label)}</div>
+          <div class="priority-context">${CIQ.esc(value ? context : kpiEmptyHint(key, value))}</div>
+        </a>`;
+      }).join("");
+
+    document.getElementById("secondaryKpis").innerHTML = SECONDARY_KPIS.map(
+      ([key, label, ico, href]) => {
+        const value = Number(k[key] || 0);
+        return `<a class="compact-kpi" href="${href}">
+          <span class="compact-ico">${ico}</span>
+          <span><strong>${value.toLocaleString()}</strong><small>${CIQ.esc(label)}</small></span>
+        </a>`;
+      }).join("");
   }
 
   function renderActions() {
@@ -75,7 +87,10 @@
     try {
       await CIQ.api.post("/api/admin/morning-refresh/run", {});
       CIQ.toast("Morning refresh started", "success");
+      const btn = document.getElementById("runRefreshBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
       setTimeout(load, 1200);
+      setTimeout(load, 7000);
     } catch (e) {
       CIQ.toast(e.message || "Could not start refresh", "error");
     }
@@ -84,14 +99,27 @@
   function renderRefresh() {
     const el = document.getElementById("refreshCard");
     const mr = data.morning_refresh || {};
-    const status = mr.status || "none";
-    const cls = ({ succeeded: "green", partial: "amber", failed: "red", running: "" })[status] || "";
-    const when = mr.last_completed ? CIQ.relTime(mr.last_completed) : "—";
-    const running = mr.running ? " · in progress" : "";
-    el.innerHTML = `<div class="company-card"><div class="cc-top">
-      <div><div class="cc-name" style="font-size:14.5px">Morning refresh status</div>
-      <div class="cc-loc">Last completed ${when}${running}</div></div>
-      <span class="badge ${cls}">${CIQ.esc(mr.label || "No refresh yet")}</span></div></div>`;
+    const items = data.jurisdiction_freshness || [];
+    const stale = items.filter((j) => String(j.status || "").toLowerCase() !== "current");
+    const when = mr.last_completed ? CIQ.relTime(mr.last_completed) : "never";
+    const running = Boolean(mr.running);
+    const healthy = !running && stale.length === 0 && mr.status === "succeeded";
+    const stateClass = running ? "running" : healthy ? "healthy" : "attention";
+    const title = running ? "Refreshing permit sources…" :
+      healthy ? "All connected sources are current" :
+      stale.length ? stale.length + " source" + (stale.length === 1 ? "" : "s") + " need attention" :
+      "Data refresh needs attention";
+    const detail = running ? "New records will appear as each jurisdiction completes." :
+      "Last pipeline completion: " + when + (stale.length ? " · review stale sources below" : "");
+    el.innerHTML = `<div class="freshness-banner ${stateClass}">
+      <span class="freshness-pulse"></span>
+      <div><strong>${CIQ.esc(title)}</strong><span>${CIQ.esc(detail)}</span></div>
+      <button class="btn btn-sm" type="button" data-refresh-now ${running ? "disabled" : ""}>
+        ${running ? "Running…" : "Run refresh now"}
+      </button>
+    </div>`;
+    const button = el.querySelector("[data-refresh-now]");
+    if (button && !running) button.addEventListener("click", runMorningRefresh);
   }
 
   function renderFreshness() {
@@ -161,7 +189,7 @@
   }
 
   async function load() {
-    document.getElementById("kpis").innerHTML = CIQ.skeletonRows
+    document.getElementById("primaryKpis").innerHTML = CIQ.skeletonRows
       ? CIQ.skeletonRows(2) : `<div class="muted">Loading…</div>`;
     try {
       data = await CIQ.api.get("/api/admin/dashboard");
@@ -170,7 +198,7 @@
       const hint = /unknown route|404/i.test(msg)
         ? " The CorridorIQ server needs a restart to load the admin dashboard API."
         : "";
-      const el = document.getElementById("kpis");
+      const el = document.getElementById("primaryKpis");
       if (el) el.innerHTML = CIQ.errorBanner(msg + hint);
       return;
     }
