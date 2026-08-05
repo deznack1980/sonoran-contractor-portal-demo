@@ -860,6 +860,19 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     if smin not in (None, ""):
         where.append("COALESCE(pr.opportunity_score,0) >= ?")
         params.append(float(smin))
+    contact_info = (filters.get("contact_info") or "").strip().lower()
+    contact_expr = (
+        "(TRIM(COALESCE(c.main_phone,'')) <> '' OR "
+        "TRIM(COALESCE(c.main_email,'')) <> '' OR "
+        "TRIM(COALESCE(c.website,'')) <> '' OR "
+        "EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id=c.id AND "
+        "(TRIM(COALESCE(ct.phone,'')) <> '' OR TRIM(COALESCE(ct.mobile_phone,'')) <> '' "
+        "OR TRIM(COALESCE(ct.email,'')) <> '')))"
+    )
+    if contact_info == "available":
+        where.append(contact_expr)
+    elif contact_info == "missing":
+        where.append("NOT " + contact_expr)
     age_days = filters.get("age_days")
     if age_days not in (None, ""):
         try:
@@ -892,7 +905,18 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
                pr.project_category, pr.project_lifecycle,
                pr.opportunity_score, pr.opportunity_date, pr.opportunity_timing,
                pr.estimated_material_value,
-               (SELECT COUNT(*) FROM permits pp WHERE pp.contractor_company_id=c.id) AS company_permit_count
+               (SELECT COUNT(*) FROM permits pp WHERE pp.contractor_company_id=c.id) AS company_permit_count,
+               CASE WHEN TRIM(COALESCE(c.main_phone,'')) <> ''
+                      OR TRIM(COALESCE(c.main_email,'')) <> ''
+                      OR TRIM(COALESCE(c.website,'')) <> ''
+                      OR EXISTS (
+                          SELECT 1 FROM contacts ct
+                          WHERE ct.company_id=c.id
+                            AND (TRIM(COALESCE(ct.phone,'')) <> ''
+                              OR TRIM(COALESCE(ct.mobile_phone,'')) <> ''
+                              OR TRIM(COALESCE(ct.email,'')) <> '')
+                      )
+                    THEN 1 ELSE 0 END AS has_contact_info
         FROM crm_company_relationships r
         JOIN companies c ON c.id=r.company_id
         JOIN projects pr ON pr.contractor_company_id=c.id
