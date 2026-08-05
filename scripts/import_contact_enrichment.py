@@ -220,17 +220,32 @@ def upsert_named_contact(conn, company_id: int, row: dict, source: str) -> tuple
 
     now = now_iso()
     if existing:
+        effective = {
+            "full_name": name or clean(existing["full_name"]),
+            "job_title": title or clean(existing["job_title"]),
+            "email": email or clean(existing["email"]),
+            "phone": phone or clean(existing["phone"]),
+            "source": source or clean(existing["source"]),
+        }
+        if all(clean(existing[column]) == value for column, value in effective.items()):
+            return "unchanged", existing["id"]
         conn.execute(
             """
             UPDATE contacts
-            SET full_name=COALESCE(NULLIF(?,''),full_name),
-                job_title=COALESCE(NULLIF(?,''),job_title),
-                email=COALESCE(NULLIF(?,''),email),
-                phone=COALESCE(NULLIF(?,''),phone),
+            SET full_name=?, job_title=?, email=?, phone=?,
                 source=?, last_seen_at=?, updated_at=?
             WHERE id=?
             """,
-            (name, title, email, phone, source, now, now, existing["id"]),
+            (
+                effective["full_name"] or None,
+                effective["job_title"] or None,
+                effective["email"] or None,
+                effective["phone"] or None,
+                effective["source"] or None,
+                now,
+                now,
+                existing["id"],
+            ),
         )
         return "updated", existing["id"]
 
@@ -325,7 +340,7 @@ def main() -> int:
     backup = backup_database()
     print(f"Database backup: {backup}")
 
-    company_updates = contacts_created = contacts_updated = 0
+    company_updates = contacts_created = contacts_updated = unchanged_rows = 0
     try:
         for company, row in accepted:
             updates = update_company(conn, company, row, args.overwrite)
@@ -335,7 +350,10 @@ def main() -> int:
             contact_action, _ = upsert_named_contact(conn, company["id"], row, source)
             contacts_created += contact_action == "created"
             contacts_updated += contact_action == "updated"
-            audit_identity_update(conn, company["id"], updates, row)
+            if updates or contact_action in {"created", "updated"}:
+                audit_identity_update(conn, company["id"], updates, row)
+            else:
+                unchanged_rows += 1
         conn.commit()
     except Exception:
         conn.rollback()
@@ -346,6 +364,7 @@ def main() -> int:
     print(f"Company profiles updated: {company_updates:,}")
     print(f"Named contacts created: {contacts_created:,}")
     print(f"Named contacts updated: {contacts_updated:,}")
+    print(f"Rows already current: {unchanged_rows:,}")
     print("IMPORT COMPLETE")
     return 0
 
