@@ -39,6 +39,7 @@
       ${p.description ? `<div class="cc-reason">${CIQ.esc(truncate(p.description, 120))}</div>` : ""}
       <div class="cc-quick">
         <a class="btn btn-sm btn-ghost" href="sales-company-profile.html?id=${p.company_id}">View company</a>
+        <a class="btn btn-sm btn-primary" href="material-list-intake.html?company_id=${p.company_id}&project_id=${p.project_id}">Build material list</a>
         ${canEdit ? `<button class="btn btn-sm" data-cid="${p.company_id}" data-pid="${p.project_id}" data-addr="${CIQ.esc(p.job_address || "")}" data-name="${CIQ.esc(p.display_name)}">Log activity</button>` : ""}
       </div>
     </div>`;
