@@ -7,6 +7,7 @@
   let rows = [];
   let sourceName = "";
   let status = "Draft";
+  let materialListId = null;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => CIQ.esc(value == null ? "" : value);
@@ -27,6 +28,7 @@
       neededBy: $("neededBy").value,
       deliveryPreference: $("deliveryPreference").value,
       requestNotes: $("requestNotes").value.trim(),
+      materialListId,
       companyId: CIQ.qs("company_id"),
       projectId: CIQ.qs("project_id"),
       sourceName,
@@ -47,8 +49,9 @@
     $("neededBy").value = draft.neededBy || "";
     $("deliveryPreference").value = draft.deliveryPreference || "delivery";
     $("requestNotes").value = draft.requestNotes || "";
-    sourceName = draft.sourceName || "";
-    status = draft.status || "Draft";
+    sourceName = draft.sourceName || draft.source_name || "";
+    status = CIQ.titleCase(String(draft.status || "Draft").replaceAll("_", " "));
+    materialListId = draft.materialListId || draft.material_list_id || draft.id || null;
     rows = Array.isArray(draft.rows) && draft.rows.length ? draft.rows.map(blankRow) : [blankRow()];
     if (sourceName) {
       $("fileName").textContent = sourceName;
@@ -144,10 +147,23 @@
     $("qtyCount").textContent = rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
   }
 
-  function saveDraft(showToast) {
-    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+  async function saveDraft(showToast) {
     status = "Draft";
+    const payload = readForm();
+    localStorage.setItem(storageKey(), JSON.stringify(payload));
     $("bomStatus").textContent = status;
+    if (payload.companyId) {
+      try {
+        const result = await CIQ.api.post("/api/material-lists", payload);
+        materialListId = result.item.id;
+        localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+        if (showToast) CIQ.toast("Draft saved to CorridorIQ", "success");
+        return;
+      } catch (error) {
+        if (showToast) CIQ.toast("Saved on this device; server save failed: " + error.message, "info");
+        return;
+      }
+    }
     if (showToast) CIQ.toast("Draft saved on this device", "success");
   }
 
@@ -207,7 +223,10 @@
     status = "Ready for review";
     localStorage.setItem(storageKey(), JSON.stringify(readForm()));
     $("bomStatus").textContent = status;
-    CIQ.toast("Material list marked ready for review", "success");
+    CIQ.api.post("/api/material-lists", readForm()).then((result) => {
+      materialListId = result.item.id;
+      CIQ.toast("Material list submitted for review", "success");
+    }).catch((error) => CIQ.toast("Saved locally; review submission failed: " + error.message, "info"));
   }
 
   async function priceWithSonoran() {
@@ -227,8 +246,46 @@
       (r.productId && r.supplierPrice != null ? CIQ.money(Number(r.qty) * Number(r.supplierPrice)) : "Review") +
       '</strong></div>').join("") + '</div>' +
       (unmatched.length ? '<div class="freshness-banner attention" style="margin-top:12px"><span class="freshness-pulse"></span><div><strong>Manual review required</strong><span>Match the highlighted items to Sonoran products before sending pricing.</span></div></div>' : "");
-    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+    const pricedPayload = readForm();
+    localStorage.setItem(storageKey(), JSON.stringify(pricedPayload));
+    if (pricedPayload.companyId) {
+      CIQ.api.post("/api/material-lists", pricedPayload).then((result) => {
+        materialListId = result.item.id;
+      }).catch(() => {});
+    }
     CIQ.toast(unmatched.length ? "Pricing calculated; unmatched items need review" : "Sonoran pricing calculated", unmatched.length ? "info" : "success");
+  }
+
+  async function loadServerDraft() {
+    const companyId = CIQ.qs("company_id");
+    if (!companyId) return false;
+    const params = new URLSearchParams({ company_id: companyId });
+    const projectId = CIQ.qs("project_id");
+    if (projectId) params.set("project_id", projectId);
+    try {
+      const result = await CIQ.api.get("/api/material-lists/latest?" + params.toString());
+      if (!result.item) return false;
+      const item = result.item;
+      writeForm({
+        id: item.id,
+        companyName: item.company_name,
+        projectName: item.project_name || item.permit_number || "",
+        neededBy: item.needed_by,
+        deliveryPreference: item.delivery_preference,
+        requestNotes: item.notes,
+        sourceName: item.source_name,
+        status: item.status,
+        rows: (item.rows || []).map((row) => ({
+          qty: row.quantity, description: row.description, unit: row.unit,
+          manufacturer: row.manufacturer, productId: row.product_id, sku: row.sku,
+          supplierPrice: row.supplier_price, quantityAvailable: row.quantity_available,
+          leadTimeDays: row.lead_time_days,
+        })),
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async function prefillContext() {
@@ -259,7 +316,8 @@
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(storageKey()) || "null"); } catch (e) {}
     writeForm(draft || { rows: [blankRow()] });
-    await prefillContext();
+    const loadedServerDraft = await loadServerDraft();
+    if (!loadedServerDraft) await prefillContext();
 
     $("sourceFile").addEventListener("change", () => {
       const file = $("sourceFile").files[0];
