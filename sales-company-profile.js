@@ -150,6 +150,7 @@
       </div>
       <div class="cc-quick">
         <button class="btn btn-sm" data-p="${p.project_id}" data-a="pdetail">View details</button>
+        <a class="btn btn-sm btn-primary" href="material-list-intake.html?company_id=${companyId}&project_id=${p.project_id}">Build material list</a>
         ${canEdit ? `<button class="btn btn-sm btn-ghost" data-p="${p.project_id}" data-addr="${CIQ.esc(p.job_address || "")}" data-a="plog">Log activity</button>` : ""}
       </div>
     </div>`;
