@@ -45,11 +45,11 @@ def _serialize(conn: sqlite3.Connection, list_id: int) -> dict:
         dict(item)
         for item in conn.execute(
             """
-            SELECT id, line_number, product_id AS productId, quantity AS qty, unit,
+            SELECT id, line_number, product_id, quantity, unit,
                    requested_description AS description, manufacturer,
-                   sku_snapshot AS sku, supplier_price_snapshot AS supplierPrice,
-                   quantity_available_snapshot AS quantityAvailable,
-                   lead_time_days_snapshot AS leadTimeDays, match_status
+                   sku_snapshot AS sku, supplier_price_snapshot AS supplier_price,
+                   quantity_available_snapshot AS quantity_available,
+                   lead_time_days_snapshot AS lead_time_days, match_status
             FROM material_list_items
             WHERE material_list_id=?
             ORDER BY line_number, id
