@@ -53,10 +53,8 @@
     status = CIQ.titleCase(String(draft.status || "Draft").replaceAll("_", " "));
     materialListId = draft.materialListId || draft.material_list_id || draft.id || null;
     rows = Array.isArray(draft.rows) && draft.rows.length ? draft.rows.map(blankRow) : [blankRow()];
-    if (sourceName) {
-      $("fileName").textContent = sourceName;
-      $("fileName").style.display = "inline-block";
-    }
+    $("fileName").textContent = sourceName;
+    $("fileName").style.display = sourceName ? "inline-block" : "none";
     render();
   }
 
@@ -225,6 +223,7 @@
     $("bomStatus").textContent = status;
     CIQ.api.post("/api/material-lists", readForm()).then((result) => {
       materialListId = result.item.id;
+      localStorage.setItem(storageKey(), JSON.stringify(readForm()));
       CIQ.toast("Material list submitted for review", "success");
     }).catch((error) => CIQ.toast("Saved locally; review submission failed: " + error.message, "info"));
   }
@@ -251,12 +250,15 @@
     if (pricedPayload.companyId) {
       CIQ.api.post("/api/material-lists", pricedPayload).then((result) => {
         materialListId = result.item.id;
-      }).catch(() => {});
+        localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+      }).catch((error) => {
+        CIQ.toast("Pricing is visible, but the server save failed: " + error.message, "info");
+      });
     }
     CIQ.toast(unmatched.length ? "Pricing calculated; unmatched items need review" : "Sonoran pricing calculated", unmatched.length ? "info" : "success");
   }
 
-  async function loadServerDraft() {
+  async function loadServerDraft(localDraft) {
     const companyId = CIQ.qs("company_id");
     if (!companyId) return false;
     const params = new URLSearchParams({ company_id: companyId });
@@ -266,6 +268,9 @@
       const result = await CIQ.api.get("/api/material-lists/latest?" + params.toString());
       if (!result.item) return false;
       const item = result.item;
+      const serverUpdated = Date.parse(item.updated_at || "") || 0;
+      const localUpdated = Date.parse(localDraft && localDraft.updatedAt || "") || 0;
+      if (localDraft && localUpdated > serverUpdated) return true;
       writeForm({
         id: item.id,
         companyName: item.company_name,
@@ -316,7 +321,7 @@
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(storageKey()) || "null"); } catch (e) {}
     writeForm(draft || { rows: [blankRow()] });
-    const loadedServerDraft = await loadServerDraft();
+    const loadedServerDraft = await loadServerDraft(draft);
     if (!loadedServerDraft) await prefillContext();
 
     $("sourceFile").addEventListener("change", () => {
@@ -340,8 +345,17 @@
     $("priceBtn").addEventListener("click", priceWithSonoran);
     $("clearBtn").addEventListener("click", async () => {
       if (!(await CIQ.confirm("Clear this material list?", { danger: true, confirmLabel: "Clear" }))) return;
-      localStorage.removeItem(storageKey()); writeForm({ rows: [blankRow()] });
-      $("sourceFile").value = ""; $("intakeStatus").innerHTML = "";
+      const context = {
+        companyName: $("companyName").value,
+        projectName: $("projectName").value,
+        materialListId,
+        rows: [blankRow()],
+      };
+      writeForm(context);
+      $("sourceFile").value = "";
+      $("intakeStatus").innerHTML = "";
+      await saveDraft(false);
+      CIQ.toast("Material list cleared", "success");
     });
     CIQ.guardUnsaved(() => false);
   });
