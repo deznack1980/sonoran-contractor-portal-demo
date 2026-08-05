@@ -85,3 +85,56 @@ def safe_generated_path(name: str):
     if target.parent != d or not target.is_file():
         return None
     return target
+
+
+def company_opportunity_report(conn: sqlite3.Connection, user: dict, limit: int = 500) -> dict:
+    """Interactive company opportunity report for the employee portal."""
+    require_permission(user, "reports.view")
+    rows = conn.execute(
+        """
+        SELECT c.id AS company_id, c.display_name, c.city, c.state,
+               c.company_type_primary, c.license_number,
+               ci.company_priority_score, ci.company_priority_tier,
+               ci.total_projects, ci.active_projects, ci.projects_last_30_days,
+               ci.average_opportunity_score, ci.highest_opportunity_score,
+               ci.municipality_count, ci.commercial_project_count,
+               ci.residential_project_count, ci.latest_activity_date,
+               ci.estimated_opportunity_total, ci.activity_trend,
+               r.relationship_status, r.assigned_user_id,
+               u.display_name AS owner_name
+        FROM companies c
+        LEFT JOIN company_intelligence ci ON ci.company_id=c.id
+        LEFT JOIN crm_company_relationships r
+          ON r.company_id=c.id AND r.organization_id=?
+        LEFT JOIN users u ON u.id=r.assigned_user_id
+        WHERE c.lifecycle_state='active'
+        ORDER BY COALESCE(ci.company_priority_score,0) DESC,
+                 COALESCE(ci.latest_activity_date,'') DESC, c.display_name
+        LIMIT ?
+        """,
+        (user["organization_id"], limit),
+    ).fetchall()
+    items = [dict(r) for r in rows]
+    tier_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Unscored": 0}
+    total_value = 0.0
+    unassigned = 0
+    active_projects = 0
+    for item in items:
+        tier = item.get("company_priority_tier") or "Unscored"
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        total_value += float(item.get("estimated_opportunity_total") or 0)
+        active_projects += int(item.get("active_projects") or 0)
+        if not item.get("assigned_user_id"):
+            unassigned += 1
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "shown": len(items),
+        "summary": {
+            "companies": len(items),
+            "active_projects": active_projects,
+            "estimated_opportunity_total": total_value,
+            "unassigned": unassigned,
+            "tiers": tier_counts,
+        },
+        "items": items,
+    }

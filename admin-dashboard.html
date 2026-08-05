@@ -3,36 +3,58 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CorridorIQ — Administration</title>
+  <title>CorridorIQ — Command Center</title>
   <link rel="stylesheet" href="portal.css" />
 </head>
 <body>
   <template id="pageContent">
-    <div class="page-head">
+    <section class="command-hero">
       <div>
-        <div class="muted" style="font-size:13px">Organization-wide overview</div>
+        <div class="eyebrow">TODAY'S OPERATING PICTURE</div>
+        <h2>Turn fresh permit signals into contractor action.</h2>
+        <p>Start with new opportunities, assign ownership, and move material demand toward pricing.</p>
       </div>
-      <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
-        <a class="btn btn-sm" href="opportunities.html">Review Opportunities</a>
-        <a class="btn btn-sm" href="assignments.html">Assign Work</a>
-        <button class="btn btn-sm btn-primary" id="runRefreshBtn" type="button">Run Morning Refresh</button>
+      <div class="command-actions">
+        <a class="btn btn-dark" href="opportunity-board.html">Open Pipeline</a>
+        <a class="btn" href="assignments.html">Assign Work</a>
+        <button class="btn btn-primary" id="runRefreshBtn" type="button">Refresh Data</button>
       </div>
-    </div>
+    </section>
 
     <div id="refreshCard"></div>
-    <div id="kpis" class="kpi-grid"></div>
 
-    <div class="section-title">Quick actions</div>
-    <div id="actions" class="stack" style="flex-direction:row;flex-wrap:wrap;gap:8px;margin-bottom:18px"></div>
+    <div class="dashboard-section-head">
+      <div><span class="eyebrow">PRIORITIES</span><h3>What needs action now</h3></div>
+      <span class="muted">Click any card to open its work queue</span>
+    </div>
+    <div id="primaryKpis" class="priority-grid"></div>
 
-    <div class="section-title">Jurisdiction freshness</div>
-    <div id="freshness"></div>
+    <div class="dashboard-split">
+      <section>
+        <div class="dashboard-section-head">
+          <div><span class="eyebrow">SOURCE HEALTH</span><h3>Jurisdiction freshness</h3></div>
+        </div>
+        <div id="freshness"></div>
+      </section>
+      <section>
+        <div class="dashboard-section-head">
+          <div><span class="eyebrow">PIPELINE</span><h3>Recent refresh activity</h3></div>
+        </div>
+        <div id="pipeline"></div>
+      </section>
+    </div>
 
-    <div class="section-title">Recent pipeline activity</div>
-    <div id="pipeline"></div>
-
-    <div class="section-title">Recent opportunity activity</div>
+    <div class="dashboard-section-head">
+      <div><span class="eyebrow">LATEST SIGNALS</span><h3>Recent opportunities</h3></div>
+      <a href="opportunity-board.html">View full pipeline →</a>
+    </div>
     <div id="opps"></div>
+
+    <details class="system-totals">
+      <summary>System totals and administration</summary>
+      <div id="secondaryKpis" class="compact-kpi-grid"></div>
+      <div id="actions" class="stack" style="flex-direction:row;flex-wrap:wrap;gap:8px;margin-top:14px"></div>
+    </details>
   </template>
   <script src="portal-common.js"></script>
   <script src="admin-dashboard.js"></script>

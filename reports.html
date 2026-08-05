@@ -3,15 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CorridorIQ — Reports</title>
+  <title>CorridorIQ — Company Opportunities</title>
   <link rel="stylesheet" href="portal.css" />
 </head>
 <body>
   <template id="pageContent">
-    <div class="section-title">Available reports</div>
-    <div id="cards" class="grid-cards"></div>
-    <div class="section-title">Recently generated files</div>
-    <div id="files"></div>
+    <section class="report-hero">
+      <div>
+        <span class="eyebrow">COMPANY OPPORTUNITY REPORT</span>
+        <h2>Prioritize the companies most likely to generate revenue.</h2>
+        <p>Live company intelligence ranked by project activity, opportunity score, estimated value, and ownership.</p>
+      </div>
+      <div id="reportExport"></div>
+    </section>
+
+    <div id="reportSummary" class="report-summary"></div>
+
+    <section class="report-workspace">
+      <div class="report-toolbar">
+        <input id="reportSearch" type="search" placeholder="Search company, city, owner, or license…" />
+        <select id="reportTier">
+          <option value="">All priority tiers</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="Unscored">Unscored</option>
+        </select>
+        <select id="reportOwner">
+          <option value="">All ownership</option>
+          <option value="unassigned">Unassigned</option>
+          <option value="assigned">Assigned</option>
+        </select>
+        <select id="reportSort">
+          <option value="priority">Highest priority</option>
+          <option value="value">Largest opportunity</option>
+          <option value="activity">Most recent activity</option>
+          <option value="projects">Most active projects</option>
+        </select>
+      </div>
+      <div id="companyReport"></div>
+    </section>
+
+    <details class="export-library">
+      <summary>Download center and other reports</summary>
+      <div class="section-title">Available exports</div>
+      <div id="cards" class="grid-cards"></div>
+      <div class="section-title">Recently generated files</div>
+      <div id="files"></div>
+    </details>
   </template>
   <script src="portal-common.js"></script>
   <script src="reports.js"></script>

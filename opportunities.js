@@ -1,22 +1,38 @@
 /* Opportunities — high-scoring projects across assigned companies. */
 (function () {
-  let page = 1; const filters = {}; let canEdit = false;
+  let page = 1; const filters = { age_days: "365" }; let canEdit = false;
 
   function truncate(s, n) { s = s || ""; return s.length > n ? s.slice(0, n) + "…" : s; }
 
+  function ageMeta(p) {
+    const raw = p.opportunity_date || p.last_updated_at || p.issued_date || p.first_seen_at;
+    if (!raw) return { label: "Date unknown", cls: "slate", days: null };
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return { label: "Date unknown", cls: "slate", days: null };
+    const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+    if (days <= 30) return { label: "Fresh · " + days + "d", cls: "green", days };
+    if (days <= 90) return { label: "Recent · " + days + "d", cls: "blue", days };
+    if (days <= 365) return { label: "Aged · " + days + "d", cls: "amber", days };
+    return { label: "Historical · " + Math.floor(days / 365) + "y", cls: "slate", days };
+  }
+
   function card(p) {
+    const age = ageMeta(p);
     return `<div class="company-card">
       <div class="cc-top">
         <div><div class="cc-name" style="font-size:15px">${CIQ.esc(p.job_address || p.permit_number || "Project")}</div>
           <div class="cc-loc"><a href="sales-company-profile.html?id=${p.company_id}">${CIQ.esc(p.display_name)}</a> · ${CIQ.esc(p.jurisdiction || p.city || "")}</div></div>
-        <span class="score-chip">${p.opportunity_score != null ? Math.round(p.opportunity_score) : "—"}</span>
+        <div class="stack" style="align-items:flex-end;gap:5px">
+          <span class="score-chip">${p.opportunity_score != null ? Math.round(p.opportunity_score) : "—"}</span>
+          <span class="badge ${age.cls}">${CIQ.esc(age.label)}</span>
+        </div>
       </div>
       <div class="cc-meta">
         <div><span>Stage</span>${CIQ.esc(CIQ.titleCase(p.project_lifecycle || "—"))}</div>
         <div><span>Timing</span>${CIQ.esc(CIQ.titleCase(p.opportunity_timing || "—"))}</div>
         <div><span>Category</span>${CIQ.esc(CIQ.titleCase(p.project_category || "—"))}</div>
         <div><span>Opportunity</span>${p.opportunity_date ? CIQ.fmtDate(p.opportunity_date) : "—"}</div>
-        <div><span>Related permits</span>${p.permit_count != null ? p.permit_count : "—"}</div>
+        <div><span>Company permit history</span>${p.company_permit_count != null ? p.company_permit_count : "—"}</div>
         <div><span>Est. value</span>${p.estimated_material_value != null ? CIQ.money(p.estimated_material_value) : "—"}</div>
       </div>
       ${p.description ? `<div class="cc-reason">${CIQ.esc(truncate(p.description, 120))}</div>` : ""}
@@ -53,17 +69,18 @@
 
   document.addEventListener("DOMContentLoaded", async () => {
     const user = await CIQ.guard("projects.view_assigned",
-      { title: "Opportunities", subtitle: "Projects that created the opening", active: "opportunities.html" });
+      { title: "Project Records", subtitle: "Permit-backed projects with clear source age", active: "opportunities.html" });
     if (!user) return;
     canEdit = CIQ.hasPerm("crm.activities.create");
     const lc = document.getElementById("flifecycle");
-    ["preconstruction", "permitting", "under_construction", "inspection", "completed"].forEach((v) => {
-      const o = document.createElement("option"); o.value = v; o.textContent = CIQ.titleCase(v); lc.appendChild(o);
+    ["Application Submitted", "Plan Review", "Permit Issued", "Construction Active", "Inspection", "Completed"].forEach((v) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = v; lc.appendChild(o);
     });
     const fq = document.getElementById("fq");
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
     lc.addEventListener("change", () => { filters.lifecycle = lc.value; page = 1; load(); });
     document.getElementById("fscore").addEventListener("change", (e) => { filters.score_min = e.target.value; page = 1; load(); });
+    document.getElementById("fage").addEventListener("change", (e) => { filters.age_days = e.target.value; page = 1; load(); });
     load();
   });
 })();
