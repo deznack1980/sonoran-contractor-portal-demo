@@ -70,9 +70,13 @@
       ["Address", address, ""],
       ["License", c.license_number, ""],
     ].filter((row) => row[1]);
+    const actionableContact = Boolean(
+      c.main_phone || c.main_email || c.website ||
+      contacts.some((person) => person.phone || person.mobile_phone || person.email)
+    );
     return '<div class="card contact-card"><div class="card-head"><h2>Contact information</h2><span class="badge ' +
-      ((companyRows.length || contacts.length) ? "green" : "amber") + '">' +
-      ((companyRows.length || contacts.length) ? "Verified fields" : "Enrichment needed") + '</span></div><div class="card-pad">' +
+      (actionableContact ? "green" : "amber") + '">' +
+      (actionableContact ? "Contact available" : "Enrichment needed") + '</span></div><div class="card-pad">' +
       (companyRows.length ? '<dl class="contact-grid">' + companyRows.map((row) => '<dt>' + row[0] + '</dt><dd>' +
         (row[2] ? '<a href="' + row[2] + CIQ.esc(row[1]) + '">' + CIQ.esc(row[1]) + '</a>' : CIQ.esc(row[1])) + '</dd>').join("") + '</dl>' : "") +
       (contacts.length ? '<div class="contact-list">' + contacts.map((person) => '<article><div><strong>' +
@@ -82,7 +86,7 @@
         (person.mobile_phone ? '<a class="btn btn-sm" href="tel:' + CIQ.esc(person.mobile_phone) + '">Mobile ' + CIQ.esc(person.mobile_phone) + '</a>' : "") +
         (person.email ? '<a class="btn btn-sm" href="mailto:' + CIQ.esc(person.email) + '">Email</a>' : "") +
         '</div></article>').join("") + '</div>' : "") +
-      (!companyRows.length && !contacts.length ? '<div class="empty-contact"><strong>No verified contact information available</strong><p>CorridorIQ has permit activity for this company, but the connected public sources did not provide a phone, email, website, address, or named contact. Contact enrichment is required.</p></div>' : "") +
+      (!actionableContact ? '<div class="empty-contact"><strong>No phone, email, website, or reachable person available</strong><p>CorridorIQ may still have permit, address, or license details for this company. Contact enrichment is required before outreach.</p></div>' : "") +
       '</div></div>';
   }
 
