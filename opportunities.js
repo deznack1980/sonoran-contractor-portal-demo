@@ -25,6 +25,7 @@
         <div class="stack" style="align-items:flex-end;gap:5px">
           <span class="score-chip">${p.opportunity_score != null ? Math.round(p.opportunity_score) : "—"}</span>
           <span class="badge ${age.cls}">${CIQ.esc(age.label)}</span>
+          <span class="badge ${p.has_contact_info ? "green" : "amber"}">${p.has_contact_info ? "Contact available" : "No contact data"}</span>
         </div>
       </div>
       <div class="cc-meta">
@@ -38,6 +39,7 @@
       ${p.description ? `<div class="cc-reason">${CIQ.esc(truncate(p.description, 120))}</div>` : ""}
       <div class="cc-quick">
         <a class="btn btn-sm btn-ghost" href="sales-company-profile.html?id=${p.company_id}">View company</a>
+        <a class="btn btn-sm btn-primary" href="material-list-intake.html?company_id=${p.company_id}&project_id=${p.project_id}">Build material list</a>
         ${canEdit ? `<button class="btn btn-sm" data-cid="${p.company_id}" data-pid="${p.project_id}" data-addr="${CIQ.esc(p.job_address || "")}" data-name="${CIQ.esc(p.display_name)}">Log activity</button>` : ""}
       </div>
     </div>`;
@@ -80,6 +82,7 @@
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
     lc.addEventListener("change", () => { filters.lifecycle = lc.value; page = 1; load(); });
     document.getElementById("fscore").addEventListener("change", (e) => { filters.score_min = e.target.value; page = 1; load(); });
+    document.getElementById("fcontact").addEventListener("change", (e) => { filters.contact_info = e.target.value; page = 1; load(); });
     document.getElementById("fage").addEventListener("change", (e) => { filters.age_days = e.target.value; page = 1; load(); });
     load();
   });

@@ -136,7 +136,8 @@ def get_company(conn: sqlite3.Connection, company_id: int) -> dict | None:
         "SELECT role_type, is_primary, source, confidence FROM company_roles "
         "WHERE company_id=? ORDER BY is_primary DESC", (company_id,))]
     contacts = [dict(r) for r in conn.execute(
-        "SELECT full_name, job_title, email, phone, is_primary, source "
+        "SELECT full_name, job_title, department, email, phone, mobile_phone, "
+        "preferred_contact_method, is_primary, source, last_seen_at "
         "FROM contacts WHERE company_id=?", (company_id,))]
     # Data quality: potential duplicates (same normalized name, other ids).
     dupes = conn.execute(

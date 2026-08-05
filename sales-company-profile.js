@@ -59,6 +59,37 @@
     </div>`;
   }
 
+  function contactSection() {
+    const c = detail.company || {};
+    const contacts = detail.contacts || [];
+    const address = [c.address_line_1, c.address_line_2, c.city, c.state, c.postal_code].filter(Boolean).join(", ");
+    const companyRows = [
+      ["Main phone", c.main_phone, "tel:"],
+      ["Main email", c.main_email, "mailto:"],
+      ["Website", c.website, /^https?:/i.test(c.website || "") ? "" : "https://"],
+      ["Address", address, ""],
+      ["License", c.license_number, ""],
+    ].filter((row) => row[1]);
+    const actionableContact = Boolean(
+      c.main_phone || c.main_email || c.website ||
+      contacts.some((person) => person.phone || person.mobile_phone || person.email)
+    );
+    return '<div class="card contact-card"><div class="card-head"><h2>Contact information</h2><span class="badge ' +
+      (actionableContact ? "green" : "amber") + '">' +
+      (actionableContact ? "Contact available" : "Enrichment needed") + '</span></div><div class="card-pad">' +
+      (companyRows.length ? '<dl class="contact-grid">' + companyRows.map((row) => '<dt>' + row[0] + '</dt><dd>' +
+        (row[2] ? '<a href="' + row[2] + CIQ.esc(row[1]) + '">' + CIQ.esc(row[1]) + '</a>' : CIQ.esc(row[1])) + '</dd>').join("") + '</dl>' : "") +
+      (contacts.length ? '<div class="contact-list">' + contacts.map((person) => '<article><div><strong>' +
+        CIQ.esc(person.full_name || "Contact") + '</strong><span>' + CIQ.esc([person.job_title, person.department].filter(Boolean).join(" · ") || "Role unavailable") +
+        '</span><small>' + CIQ.esc(person.source ? "Source: " + person.source : "Verified source") + '</small></div><div class="contact-actions">' +
+        (person.phone ? '<a class="btn btn-sm" href="tel:' + CIQ.esc(person.phone) + '">Call ' + CIQ.esc(person.phone) + '</a>' : "") +
+        (person.mobile_phone ? '<a class="btn btn-sm" href="tel:' + CIQ.esc(person.mobile_phone) + '">Mobile ' + CIQ.esc(person.mobile_phone) + '</a>' : "") +
+        (person.email ? '<a class="btn btn-sm" href="mailto:' + CIQ.esc(person.email) + '">Email</a>' : "") +
+        '</div></article>').join("") + '</div>' : "") +
+      (!actionableContact ? '<div class="empty-contact"><strong>No phone, email, website, or reachable person available</strong><p>CorridorIQ may still have permit, address, or license details for this company. Contact enrichment is required before outreach.</p></div>' : "") +
+      '</div></div>';
+  }
+
   function crmSection() {
     const r = detail.relationship || {};
     const last = activities[0];
@@ -123,6 +154,7 @@
       </div>
       <div class="cc-quick">
         <button class="btn btn-sm" data-p="${p.project_id}" data-a="pdetail">View details</button>
+        <a class="btn btn-sm btn-primary" href="material-list-intake.html?company_id=${companyId}&project_id=${p.project_id}">Build material list</a>
         ${canEdit ? `<button class="btn btn-sm btn-ghost" data-p="${p.project_id}" data-addr="${CIQ.esc(p.job_address || "")}" data-a="plog">Log activity</button>` : ""}
       </div>
     </div>`;
@@ -184,7 +216,7 @@
 
   function render() {
     const root = document.getElementById("root");
-    root.innerHTML = header()
+    root.innerHTML = header() + contactSection()
       + `<div class="two-col" style="margin-top:18px">${crmSection()}${intelSection()}</div>`
       + oppsSection() + timelineSection() + dataDetails();
     wireActions();

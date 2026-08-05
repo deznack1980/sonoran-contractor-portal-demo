@@ -31,6 +31,7 @@ from pipeline.crm import admin as crm_admin
 from pipeline.crm import service as crm
 from pipeline.crm.service import ValidationError
 from pipeline.products import service as products
+from pipeline.material_lists import service as material_lists
 from pipeline.reports import catalog as reports_catalog
 from pipeline import pipeline_runs
 from pipeline.db.database import get_connection, init_db
@@ -307,6 +308,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             require_permission(user, "pipeline.monitor")
             return self._json(200, pipeline_runs.admin_status(conn))
 
+        # --- material lists ---
+        if path == "/api/material-lists/latest":
+            return self._json(200, material_lists.latest(conn, user, query))
+
         # --- reports ---
         if path == "/api/reports/catalog":
             return self._json(200, reports_catalog.catalog(conn, user))
@@ -384,6 +389,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         m = _SALES_TASK_RE.match(path)
         if m and method == "PATCH":
             return self._json(200, crm.update_task(conn, user, int(m.group(1)), body, ip=ip, ua=ua))
+
+        if method == "POST" and path == "/api/material-lists":
+            return self._json(200, material_lists.save(conn, user, body, ip=ip, ua=ua))
 
         # --- manager ---
         if method == "POST" and path == "/api/manager/assignments":
