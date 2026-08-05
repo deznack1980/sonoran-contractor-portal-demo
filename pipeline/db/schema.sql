@@ -902,3 +902,50 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_type_time
     ON pipeline_runs(run_type, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+
+
+-- ============================================================
+-- Server-backed material list workflow
+-- Organization-owned drafts and immutable line snapshots.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS material_lists (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id     INTEGER NOT NULL REFERENCES organizations(id),
+    company_id          INTEGER NOT NULL REFERENCES companies(id),
+    project_id          INTEGER REFERENCES projects(id),
+    created_by_user_id  INTEGER NOT NULL REFERENCES users(id),
+    needed_by           TEXT,
+    delivery_preference TEXT,
+    notes               TEXT,
+    source_name         TEXT,
+    status              TEXT NOT NULL DEFAULT 'draft'
+                        CHECK(status IN ('draft','ready_for_review','pricing_requested','needs_catalog_review','priced')),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_material_lists_org_company
+    ON material_lists(organization_id, company_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_material_lists_project
+    ON material_lists(project_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS material_list_items (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_list_id            INTEGER NOT NULL REFERENCES material_lists(id) ON DELETE CASCADE,
+    line_number                 INTEGER NOT NULL,
+    product_id                  INTEGER REFERENCES products(id),
+    quantity                    REAL NOT NULL,
+    unit                        TEXT,
+    requested_description       TEXT NOT NULL,
+    manufacturer                TEXT,
+    sku_snapshot                TEXT,
+    supplier_price_snapshot     REAL,
+    quantity_available_snapshot REAL,
+    lead_time_days_snapshot     INTEGER,
+    match_status                TEXT NOT NULL DEFAULT 'manual'
+                                CHECK(match_status IN ('catalog','manual')),
+    created_at                  TEXT NOT NULL,
+    updated_at                  TEXT NOT NULL,
+    UNIQUE(material_list_id, line_number)
+);
+CREATE INDEX IF NOT EXISTS idx_material_list_items_list
+    ON material_list_items(material_list_id, line_number);
