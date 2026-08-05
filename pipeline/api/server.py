@@ -40,8 +40,7 @@ HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
 
-# Portal files served same-origin (allowlist by extension + known names).
-_STATIC_SUFFIXES = (".html", ".js", ".css")
+# Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
     "login.html", "sales-dashboard.html", "sales-dashboard.js",
     "my-companies.html", "my-companies.js", "sales-company-profile.html",
@@ -193,7 +192,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         name = path.lstrip("/") or "login.html"
         if name in ("", "index.html"):
             name = "login.html"
-        if name not in _PORTAL_PAGES and not name.endswith(_STATIC_SUFFIXES):
+        if name not in _PORTAL_PAGES:
             return False
         target = (settings.PROJECT_ROOT / name).resolve()
         # Prevent path traversal outside the project root.
@@ -207,6 +206,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
         return True
