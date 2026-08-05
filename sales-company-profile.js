@@ -74,13 +74,13 @@
       ((companyRows.length || contacts.length) ? "green" : "amber") + '">' +
       ((companyRows.length || contacts.length) ? "Verified fields" : "Enrichment needed") + '</span></div><div class="card-pad">' +
       (companyRows.length ? '<dl class="contact-grid">' + companyRows.map((row) => '<dt>' + row[0] + '</dt><dd>' +
-        (row[2] ? '<a href="' + row[2] + esc(row[1]) + '">' + esc(row[1]) + '</a>' : esc(row[1])) + '</dd>').join("") + '</dl>' : "") +
+        (row[2] ? '<a href="' + row[2] + CIQ.esc(row[1]) + '">' + CIQ.esc(row[1]) + '</a>' : CIQ.esc(row[1])) + '</dd>').join("") + '</dl>' : "") +
       (contacts.length ? '<div class="contact-list">' + contacts.map((person) => '<article><div><strong>' +
-        esc(person.full_name || "Contact") + '</strong><span>' + esc([person.job_title, person.department].filter(Boolean).join(" · ") || "Role unavailable") +
-        '</span><small>' + esc(person.source ? "Source: " + person.source : "Verified source") + '</small></div><div class="contact-actions">' +
-        (person.phone ? '<a class="btn btn-sm" href="tel:' + esc(person.phone) + '">Call ' + esc(person.phone) + '</a>' : "") +
-        (person.mobile_phone ? '<a class="btn btn-sm" href="tel:' + esc(person.mobile_phone) + '">Mobile ' + esc(person.mobile_phone) + '</a>' : "") +
-        (person.email ? '<a class="btn btn-sm" href="mailto:' + esc(person.email) + '">Email</a>' : "") +
+        CIQ.esc(person.full_name || "Contact") + '</strong><span>' + CIQ.esc([person.job_title, person.department].filter(Boolean).join(" · ") || "Role unavailable") +
+        '</span><small>' + CIQ.esc(person.source ? "Source: " + person.source : "Verified source") + '</small></div><div class="contact-actions">' +
+        (person.phone ? '<a class="btn btn-sm" href="tel:' + CIQ.esc(person.phone) + '">Call ' + CIQ.esc(person.phone) + '</a>' : "") +
+        (person.mobile_phone ? '<a class="btn btn-sm" href="tel:' + CIQ.esc(person.mobile_phone) + '">Mobile ' + CIQ.esc(person.mobile_phone) + '</a>' : "") +
+        (person.email ? '<a class="btn btn-sm" href="mailto:' + CIQ.esc(person.email) + '">Email</a>' : "") +
         '</div></article>').join("") + '</div>' : "") +
       (!companyRows.length && !contacts.length ? '<div class="empty-contact"><strong>No verified contact information available</strong><p>CorridorIQ has permit activity for this company, but the connected public sources did not provide a phone, email, website, address, or named contact. Contact enrichment is required.</p></div>' : "") +
       '</div></div>';
