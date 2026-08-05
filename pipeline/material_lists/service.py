@@ -14,7 +14,7 @@ from pipeline.auth.service import write_audit
 from pipeline.crm.service import ValidationError
 
 
-STATUSES = {"draft", "ready_for_review", "pricing_requested", "priced"}
+STATUSES = {"draft", "ready_for_review", "pricing_requested", "needs_catalog_review", "priced"}
 
 
 def _now() -> str:
