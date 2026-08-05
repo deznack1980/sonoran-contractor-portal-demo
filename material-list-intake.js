@@ -1,6 +1,9 @@
 /* CorridorIQ material-list MVP: editable BOM, CSV import, and resilient local drafts. */
 (function () {
-  const STORAGE_KEY = "ciq.material-list.draft.v1";
+  const STORAGE_KEY_PREFIX = "ciq.material-list.draft.v2";
+  function storageKey() {
+    return STORAGE_KEY_PREFIX + "." + (CIQ.qs("company_id") || "new") + "." + (CIQ.qs("project_id") || "general");
+  }
   let rows = [];
   let sourceName = "";
   let status = "Draft";
@@ -77,6 +80,25 @@
         }
         renderCounts();
       });
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const rowIndex = rows.findIndex((r) => r.id === input.closest("tr").dataset.id);
+        if (input.dataset.field === "qty") {
+          const description = $("bomBody").querySelectorAll('input[data-field="description"]')[rowIndex];
+          if (description) description.focus();
+          return;
+        }
+        if (input.dataset.field === "description") {
+          if (rowIndex === rows.length - 1) rows.push(blankRow());
+          render();
+          setTimeout(() => {
+            const descriptions = $("bomBody").querySelectorAll('input[data-field="description"]');
+            const next = descriptions[Math.min(rowIndex + 1, descriptions.length - 1)];
+            if (next) next.focus();
+          }, 0);
+        }
+      });
     });
     $("bomBody").querySelectorAll("[data-remove]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -123,7 +145,7 @@
   }
 
   function saveDraft(showToast) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(readForm()));
+    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
     status = "Draft";
     $("bomStatus").textContent = status;
     if (showToast) CIQ.toast("Draft saved on this device", "success");
@@ -183,7 +205,7 @@
     const error = validate();
     if (error) { CIQ.toast(error, "error"); return; }
     status = "Ready for review";
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(readForm()));
+    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
     $("bomStatus").textContent = status;
     CIQ.toast("Material list marked ready for review", "success");
   }
@@ -205,7 +227,7 @@
       (r.productId && r.supplierPrice != null ? CIQ.money(Number(r.qty) * Number(r.supplierPrice)) : "Review") +
       '</strong></div>').join("") + '</div>' +
       (unmatched.length ? '<div class="freshness-banner attention" style="margin-top:12px"><span class="freshness-pulse"></span><div><strong>Manual review required</strong><span>Match the highlighted items to Sonoran products before sending pricing.</span></div></div>' : "");
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(readForm()));
+    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
     CIQ.toast(unmatched.length ? "Pricing calculated; unmatched items need review" : "Sonoran pricing calculated", unmatched.length ? "info" : "success");
   }
 
@@ -235,7 +257,7 @@
     if (!user) return;
 
     let draft = null;
-    try { draft = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch (e) {}
+    try { draft = JSON.parse(localStorage.getItem(storageKey()) || "null"); } catch (e) {}
     writeForm(draft || { rows: [blankRow()] });
     await prefillContext();
 
@@ -260,7 +282,7 @@
     $("priceBtn").addEventListener("click", priceWithSonoran);
     $("clearBtn").addEventListener("click", async () => {
       if (!(await CIQ.confirm("Clear this material list?", { danger: true, confirmLabel: "Clear" }))) return;
-      localStorage.removeItem(STORAGE_KEY); writeForm({ rows: [blankRow()] });
+      localStorage.removeItem(storageKey()); writeForm({ rows: [blankRow()] });
       $("sourceFile").value = ""; $("intakeStatus").innerHTML = "";
     });
     CIQ.guardUnsaved(() => false);
