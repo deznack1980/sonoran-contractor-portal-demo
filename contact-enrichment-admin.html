@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Contact Import</title>
+  <link rel="stylesheet" href="portal.css" />
+  <style>
+    .import-grid { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(260px, .55fr); gap:18px; align-items:start; }
+    .import-card { padding:20px; }
+    .import-card h2 { margin:0 0 6px; font-size:17px; }
+    .step-label { color:var(--gold-strong); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .file-box { margin:16px 0; padding:18px; border:1px dashed var(--border-strong, var(--border)); border-radius:12px; background:var(--surface-2); }
+    .file-box input { width:100%; margin-top:10px; }
+    .file-meta { margin-top:9px; font-size:12px; color:var(--text-3); overflow-wrap:anywhere; }
+    .action-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .status-msg { margin-top:12px; padding:10px 12px; border-radius:9px; font-size:13px; }
+    .status-msg.ok { background:var(--green-bg); color:var(--green); }
+    .status-msg.info { background:var(--blue-bg, var(--surface-2)); color:var(--text-2); }
+    .status-msg.err { background:var(--red-bg); color:var(--red); }
+    .preview-panel { margin-top:18px; }
+    .count-grid { display:grid; grid-template-columns:repeat(5, minmax(92px, 1fr)); gap:9px; margin:12px 0; }
+    .count-box { padding:12px 8px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); text-align:center; }
+    .count-box strong { display:block; color:var(--text-1); font-size:22px; line-height:1.1; }
+    .count-box span { display:block; margin-top:4px; color:var(--text-3); font-size:11px; }
+    .count-box.good strong { color:var(--green); }
+    .count-box.warn strong { color:var(--amber, #a85f00); }
+    .count-box.bad strong { color:var(--red); }
+    .result-note { padding:11px 12px; border-left:3px solid var(--gold-strong); background:var(--surface-2); border-radius:7px; font-size:13px; }
+    .reject-wrap { margin-top:14px; overflow-x:auto; }
+    .reject-table { width:100%; border-collapse:collapse; min-width:620px; font-size:12px; }
+    .reject-table th, .reject-table td { padding:8px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top; }
+    .safety-list { margin:12px 0 0; padding-left:19px; color:var(--text-2); font-size:13px; }
+    .safety-list li { margin:0 0 10px; }
+    .next-link { display:block; margin-top:14px; }
+    @media (max-width:1000px) {
+      .import-grid { grid-template-columns:1fr; }
+    }
+    @media (max-width:720px) {
+      .import-card { padding:16px; }
+      .count-grid { grid-template-columns:repeat(2, 1fr); }
+      .count-box:first-child { grid-column:1 / -1; }
+      .action-row .btn { width:100%; justify-content:center; }
+    }
+  </style>
+</head>
+<body>
+  <template id="pageContent">
+    <div class="import-grid">
+      <section class="card import-card">
+        <div class="step-label">Contact enrichment</div>
+        <h2>Upload a completed Perplexity CSV</h2>
+        <p class="muted" style="margin:0">Preview validation first. CorridorIQ will not change the database until you approve the import.</p>
+
+        <div class="file-box">
+          <label for="contactFile"><strong>Completed contact research file</strong></label>
+          <input type="file" id="contactFile" accept=".csv,text/csv" />
+          <div class="file-meta" id="fileMeta">CSV only · maximum 5 MB · up to 5,000 companies</div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn" id="previewBtn" disabled>1. Preview validation</button>
+          <button class="btn btn-primary" id="importBtn" disabled>2. Back up &amp; import</button>
+        </div>
+        <div id="statusMsg" aria-live="polite"></div>
+
+        <div class="preview-panel" id="previewPanel" hidden>
+          <h2>Validation result</h2>
+          <div class="count-grid">
+            <div class="count-box"><strong id="countInput">0</strong><span>Input rows</span></div>
+            <div class="count-box good"><strong id="countImportable">0</strong><span>Ready to import</span></div>
+            <div class="count-box good"><strong id="countActionable">0</strong><span>Actionable contacts</span></div>
+            <div class="count-box warn"><strong id="countSkipped">0</strong><span>Safely skipped</span></div>
+            <div class="count-box bad"><strong id="countRejected">0</strong><span>Must be fixed</span></div>
+          </div>
+          <div class="result-note" id="previewNote"></div>
+          <div id="rejectionArea"></div>
+        </div>
+
+        <div id="importResult" hidden></div>
+      </section>
+
+      <aside>
+        <section class="card import-card">
+          <div class="step-label">Built-in protection</div>
+          <h2>What CorridorIQ checks</h2>
+          <ul class="safety-list">
+            <li>Company ID and name must match the existing company or an approved alias.</li>
+            <li>Every contact value needs a valid research source URL.</li>
+            <li>Rejected rows block the entire import; Not Found and Ambiguous rows are safely skipped.</li>
+            <li>A dated SQLite backup is created immediately before any database changes.</li>
+            <li>Existing company phone, email, website, and address values are preserved.</li>
+          </ul>
+        </section>
+
+        <section class="card import-card">
+          <div class="step-label">After import</div>
+          <h2>Work the contact-ready list</h2>
+          <p class="muted" style="margin:0">Companies with contact information automatically rise above companies that still need research.</p>
+          <a class="btn next-link" href="my-companies.html">Open Companies</a>
+        </section>
+      </aside>
+    </div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="contact-enrichment-admin.js"></script>
+</body>
+</html>
