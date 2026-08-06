@@ -32,6 +32,18 @@ ACTIVITY_OUTCOMES = {
 TASK_STATUSES = {"open", "in_progress", "completed", "cancelled", "overdue"}
 TASK_PRIORITIES = {"low", "normal", "high", "urgent"}
 
+# Actionable public contact channels. Used consistently for filtering, badges,
+# and contact-first sales prioritization.
+_CONTACT_INFO_SQL = (
+    "(TRIM(COALESCE(c.main_phone,'')) <> '' OR "
+    "TRIM(COALESCE(c.main_email,'')) <> '' OR "
+    "TRIM(COALESCE(c.website,'')) <> '' OR "
+    "EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id=c.id AND "
+    "(TRIM(COALESCE(ct.phone,'')) <> '' OR "
+    "TRIM(COALESCE(ct.mobile_phone,'')) <> '' OR "
+    "TRIM(COALESCE(ct.email,'')) <> '')))"
+)
+
 _STATUS_TIMESTAMP = {
     "qualified": "qualified_at",
     "won": "won_at",
@@ -598,6 +610,11 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
     if smax not in (None, ""):
         where.append("COALESCE(ci.company_priority_score,0) <= ?")
         params.append(float(smax))
+    contact_info = (filters.get("contact_info") or "").strip().lower()
+    if contact_info == "available":
+        where.append(_CONTACT_INFO_SQL)
+    elif contact_info == "missing":
+        where.append("NOT " + _CONTACT_INFO_SQL)
     followup = (filters.get("followup") or "").strip()
     if followup == "due":
         where.append("r.next_followup_at IS NOT NULL AND substr(r.next_followup_at,1,10) <= ?")
@@ -640,6 +657,7 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
                ci.latest_activity_date, ci.municipality_count,
                r.relationship_status, r.assigned_user_id, r.last_contact_at,
                r.next_followup_at, r.do_not_contact, u.display_name AS assigned_to,
+               CASE WHEN {_CONTACT_INFO_SQL} THEN 1 ELSE 0 END AS has_contact_info,
                (SELECT role_type FROM company_roles cr WHERE cr.company_id=c.id
                 ORDER BY is_primary DESC LIMIT 1) AS primary_role
         FROM crm_company_relationships r
@@ -647,7 +665,8 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
         LEFT JOIN company_intelligence ci ON ci.company_id = c.id
         LEFT JOIN users u ON u.id = r.assigned_user_id
         WHERE {where_sql}
-        ORDER BY COALESCE(ci.company_priority_score,0) DESC,
+        ORDER BY has_contact_info DESC,
+                 COALESCE(ci.company_priority_score,0) DESC,
                  ci.latest_activity_date DESC
         LIMIT ? OFFSET ?
         """,
@@ -861,18 +880,10 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
         where.append("COALESCE(pr.opportunity_score,0) >= ?")
         params.append(float(smin))
     contact_info = (filters.get("contact_info") or "").strip().lower()
-    contact_expr = (
-        "(TRIM(COALESCE(c.main_phone,'')) <> '' OR "
-        "TRIM(COALESCE(c.main_email,'')) <> '' OR "
-        "TRIM(COALESCE(c.website,'')) <> '' OR "
-        "EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id=c.id AND "
-        "(TRIM(COALESCE(ct.phone,'')) <> '' OR TRIM(COALESCE(ct.mobile_phone,'')) <> '' "
-        "OR TRIM(COALESCE(ct.email,'')) <> '')))"
-    )
     if contact_info == "available":
-        where.append(contact_expr)
+        where.append(_CONTACT_INFO_SQL)
     elif contact_info == "missing":
-        where.append("NOT " + contact_expr)
+        where.append("NOT " + _CONTACT_INFO_SQL)
     age_days = filters.get("age_days")
     if age_days not in (None, ""):
         try:
@@ -906,23 +917,16 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
                pr.opportunity_score, pr.opportunity_date, pr.opportunity_timing,
                pr.estimated_material_value,
                (SELECT COUNT(*) FROM permits pp WHERE pp.contractor_company_id=c.id) AS company_permit_count,
-               CASE WHEN TRIM(COALESCE(c.main_phone,'')) <> ''
-                      OR TRIM(COALESCE(c.main_email,'')) <> ''
-                      OR TRIM(COALESCE(c.website,'')) <> ''
-                      OR EXISTS (
-                          SELECT 1 FROM contacts ct
-                          WHERE ct.company_id=c.id
-                            AND (TRIM(COALESCE(ct.phone,'')) <> ''
-                              OR TRIM(COALESCE(ct.mobile_phone,'')) <> ''
-                              OR TRIM(COALESCE(ct.email,'')) <> '')
-                      )
+               CASE WHEN {_CONTACT_INFO_SQL}
                     THEN 1 ELSE 0 END AS has_contact_info
         FROM crm_company_relationships r
         JOIN companies c ON c.id=r.company_id
         JOIN projects pr ON pr.contractor_company_id=c.id
         JOIN permits p ON p.id=pr.permit_id
         WHERE {where_sql}
-        ORDER BY COALESCE(pr.opportunity_score,0) DESC, pr.opportunity_date DESC
+        ORDER BY has_contact_info DESC,
+                 COALESCE(pr.opportunity_score,0) DESC,
+                 pr.opportunity_date DESC
         LIMIT ? OFFSET ?
         """,
         [*params, page_size, (page - 1) * page_size]).fetchall()
