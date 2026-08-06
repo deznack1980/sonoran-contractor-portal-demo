@@ -61,6 +61,7 @@ _PORTAL_PAGES = {
     "opportunity-board.js", "opportunity-board.css", "material-list-intake.html",
     "material-list-intake.js", "activity.html", "activity.js", "reports.html",
     "reports.js", "assignments.html", "assignments.js", "portal.css",
+    "portal-common.js",
     # Admin contact enrichment workflow.
     "contact-enrichment-admin.html", "contact-enrichment-admin.js",
 }
