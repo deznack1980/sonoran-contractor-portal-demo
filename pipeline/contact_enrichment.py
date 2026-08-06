@@ -110,6 +110,7 @@ def parse_csv_bytes(filename: str, raw: bytes) -> list[dict]:
     missing = sorted(REQUIRED_COLUMNS.difference(headers))
     if missing:
         raise ValueError("Missing required columns: " + ", ".join(missing))
+    reader.fieldnames = headers
 
     rows = [dict(row) for row in reader if any(clean(value) for value in row.values())]
     if not rows:
