@@ -36,6 +36,7 @@
         <div class="stack" style="align-items:flex-end;gap:6px">
           ${CIQ.tierBadge(c.company_priority_tier)}
           ${CIQ.statusBadge(c.relationship_status)}
+          <span class="badge ${c.has_contact_info ? "green" : "amber"}">${c.has_contact_info ? "Contact ready" : "Needs contact"}</span>
         </div>
       </div>
       <div class="cc-reason">${CIQ.esc(c.reason)}</div>
