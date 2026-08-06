@@ -40,6 +40,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
+BUILD_ID = "2026-08-06-launcher-v2"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -264,7 +265,9 @@ class ApiHandler(BaseHTTPRequestHandler):
     # ---- GET routes -------------------------------------------------------
     def _route_get(self, conn, path, query):
         if path == "/api/health":
-            return self._json(200, {"ok": True, "service": "corridoriq-sales"})
+            return self._json(200, {
+                "ok": True, "service": "corridoriq-sales", "build": BUILD_ID,
+            })
         if path == "/api/auth/me":
             user = self._require_user(conn)
             if user is None:
