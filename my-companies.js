@@ -6,6 +6,8 @@
 
   const VIEWS = [
     ["priority", "Priority", {}],
+    ["contact", "Contact Ready", { contact_info: "available" }],
+    ["enrichment", "Needs Enrichment", { contact_info: "missing" }],
     ["never", "Never Contacted", { contacted: "never" }],
     ["followup", "Follow-Up Due", { followup: "due" }],
     ["new", "New Opportunities", { status: "assigned" }],
@@ -24,7 +26,7 @@
   function applyView(key) {
     const def = VIEWS.find((v) => v[0] === key);
     // Reset filter-driven fields, keep search text.
-    ["status", "tier", "followup", "contacted", "do_not_contact", "municipality"].forEach((k) => delete filters[k]);
+    ["status", "tier", "followup", "contacted", "contact_info", "do_not_contact", "municipality"].forEach((k) => delete filters[k]);
     document.getElementById("fstatus").value = "";
     document.getElementById("ftier").value = "";
     document.getElementById("ffollowup").value = "";
@@ -49,6 +51,7 @@
         </div>
         <div class="stack" style="align-items:flex-end;gap:6px">
           ${CIQ.tierBadge(c.company_priority_tier)}${CIQ.statusBadge(c.relationship_status)}
+          <span class="badge ${c.has_contact_info ? "green" : "amber"}">${c.has_contact_info ? "Contact ready" : "Needs contact"}</span>
         </div>
       </div>
       <div class="cc-reason">${CIQ.esc(c.reason)}</div>
