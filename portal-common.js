@@ -73,6 +73,7 @@
           { href: "team-dashboard.html", label: "Team", icon: "☰", perm: "users.view" },
           { href: "reports.html", label: "Reports", icon: "⊟", perm: "reports.view" },
           { href: "user-management.html", label: "Users", icon: "⦿", perm: "users.create" },
+          { href: "contact-enrichment-admin.html", label: "Contact Import", icon: "⇩", perm: "admin.system" },
           { href: "catalog-admin.html", label: "Administration", icon: "⚙", perm: "admin.system" },
         ] },
       ];
