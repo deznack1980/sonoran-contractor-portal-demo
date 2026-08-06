@@ -34,6 +34,7 @@ from pipeline.products import service as products
 from pipeline.material_lists import service as material_lists
 from pipeline.reports import catalog as reports_catalog
 from pipeline import pipeline_runs
+from pipeline import contact_enrichment
 from pipeline.db.database import get_connection, init_db
 
 HOST = "127.0.0.1"
@@ -59,6 +60,8 @@ _PORTAL_PAGES = {
     "opportunity-board.js", "opportunity-board.css", "material-list-intake.html",
     "material-list-intake.js", "activity.html", "activity.js", "reports.html",
     "reports.js", "assignments.html", "assignments.js", "portal.css",
+    # Admin contact enrichment workflow.
+    "contact-enrichment-admin.html", "contact-enrichment-admin.js",
 }
 
 _ID = r"(\d+)"
@@ -413,6 +416,13 @@ class ApiHandler(BaseHTTPRequestHandler):
         if m and method == "PATCH":
             return self._json(200, crm_admin.update_user(conn, user, int(m.group(1)), body, ip=ip, ua=ua))
 
+        # --- contact enrichment ---
+        if method == "POST" and path == "/api/admin/contact-enrichment/preview":
+            return self._json(200, contact_enrichment.preview_upload(conn, user, body))
+        if method == "POST" and path == "/api/admin/contact-enrichment/import":
+            return self._json(200, contact_enrichment.import_upload(
+                conn, user, body, ip=ip, ua=ua))
+
         # --- products (Sprint 6) ---
         if method == "POST" and path == "/api/products/quote":
             return self._json(200, products.quote(
@@ -444,6 +454,7 @@ def main():
     print("  GET/POST /api/admin/users ; PATCH /api/admin/users/<id>")
     print("  GET /api/products/search ; POST /api/products/quote")
     print("  GET/POST /api/admin/suppliers ; POST /api/admin/catalog/preview|import")
+    print("  POST /api/admin/contact-enrichment/preview|import")
     print("  GET /api/admin/catalog/imports ; GET/PATCH /api/admin/pricing/delivery")
     print("  GET /api/status/refresh ; GET /api/admin/morning-refresh ; "
           "POST /api/admin/morning-refresh/run")
