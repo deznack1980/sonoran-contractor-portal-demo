@@ -24,10 +24,28 @@
   async function loadSuppliers() {
     const data = await CIQ.api.get("/api/admin/suppliers");
     document.querySelector("#suppliersTable tbody").innerHTML = data.items.map((s) => `
-      <tr><td>${CIQ.esc(s.name)}</td><td>${CIQ.esc(s.code)}</td>
-      <td>${CIQ.esc([s.city, s.state].filter(Boolean).join(", "))}</td>
-      <td>${s.latitude != null ? s.latitude + ", " + s.longitude : '<span class="muted">—</span>'}</td></tr>`
-    ).join("") || `<tr><td colspan="4" class="muted">No suppliers yet.</td></tr>`;
+      <tr data-supplier-id="${s.id}"><td><strong>${CIQ.esc(s.name)}</strong><small class="muted" style="display:block">${CIQ.esc(s.code)}</small></td>
+      <td><input data-field="quote_contact_name" value="${CIQ.esc(s.quote_contact_name || "")}" placeholder="Contact name" /></td>
+      <td><input data-field="quote_email" type="email" value="${CIQ.esc(s.quote_email || "")}" placeholder="quotes@example.com" /></td>
+      <td><input data-field="quote_phone" type="tel" value="${CIQ.esc(s.quote_phone || "")}" placeholder="Phone" /></td>
+      <td><button class="btn btn-sm" type="button" data-save-supplier>Save</button></td></tr>`
+    ).join("") || `<tr><td colspan="5" class="muted">No suppliers yet.</td></tr>`;
+    document.querySelectorAll("[data-save-supplier]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const row = button.closest("tr");
+        const payload = {};
+        row.querySelectorAll("[data-field]").forEach((input) => { payload[input.dataset.field] = input.value.trim(); });
+        button.disabled = true; button.textContent = "Saving…";
+        try {
+          await CIQ.api.patch("/api/admin/suppliers/" + row.dataset.supplierId, payload);
+          CIQ.toast("Supplier quote contact saved", "success");
+          button.textContent = "Saved";
+        } catch (error) {
+          CIQ.toast(error.message || "Could not save supplier contact", "error");
+          button.disabled = false; button.textContent = "Save";
+        }
+      });
+    });
   }
 
   async function loadHistory() {
@@ -55,6 +73,9 @@
       city: document.getElementById("supCity").value.trim(),
       state: document.getElementById("supState").value.trim(),
       warehouse_address: document.getElementById("supAddr").value.trim(),
+      quote_contact_name: document.getElementById("supQuoteName").value.trim(),
+      quote_email: document.getElementById("supQuoteEmail").value.trim(),
+      quote_phone: document.getElementById("supQuotePhone").value.trim(),
       latitude: parseFloat(document.getElementById("supLat").value) || null,
       longitude: parseFloat(document.getElementById("supLng").value) || null,
     };
