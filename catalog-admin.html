@@ -43,6 +43,11 @@
             <label class="field">Longitude<input id="supLng" placeholder="-112.0740" /></label>
           </div>
           <label class="field">Warehouse address<input id="supAddr" placeholder="Optional" /></label>
+          <div class="row">
+            <label class="field">Quote contact<input id="supQuoteName" placeholder="Sales desk or contact name" /></label>
+            <label class="field">Quote email<input id="supQuoteEmail" type="email" placeholder="quotes@example.com" /></label>
+          </div>
+          <label class="field">Quote phone<input id="supQuotePhone" type="tel" placeholder="Optional" /></label>
           <button class="btn btn-primary" id="addSupplierBtn">Add supplier</button>
           <div id="supMsg"></div>
         </div>
@@ -50,7 +55,7 @@
         <div class="card">
           <h2>Suppliers</h2>
           <table class="mini" id="suppliersTable">
-            <thead><tr><th>Name</th><th>Code</th><th>Location</th><th>Coords</th></tr></thead>
+            <thead><tr><th>Supplier</th><th>Quote contact</th><th>Quote email</th><th>Phone</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

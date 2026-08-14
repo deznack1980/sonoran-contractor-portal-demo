@@ -17,7 +17,7 @@ import pytest
 from pipeline.auth import service as auth
 from pipeline.auth.rbac import AuthzError
 from pipeline.auth.seed import seed_auth
-from pipeline.config.settings import SCHEMA_PATH
+from pipeline.config.settings import PROJECT_ROOT, SCHEMA_PATH
 from pipeline.crm import admin as crm_admin
 from pipeline.crm import service as crm
 from pipeline.reports import catalog as reports_catalog
@@ -408,11 +408,19 @@ def http_server(tmp_path, monkeypatch):
               "VALUES ('phoenix_az','Phoenix','AZ','connected')")
     seed_auth(c)
     org = _org(c)
-    auth.create_user(c, organization_id=org, email="uiadmin@corridoriq.com",
-                     password="UiAdmin123", role_names=["admin"], must_change_password=False)
+    admin_id = auth.create_user(c, organization_id=org, email="uiadmin@corridoriq.com",
+                                password="UiAdmin123", role_names=["admin"], must_change_password=False)
     rep_id = auth.create_user(c, organization_id=org, email="uirep@corridoriq.com",
                               password="UiRep123", role_names=["sales_representative"],
                               must_change_password=False)
+    company_id = _company(c, "UI Quote Plumbing")
+    crm.assign_company(c, _ctx(c, admin_id), company_id, rep_id, reason="HTTP RFQ test")
+    now = _now()
+    supplier_id = c.execute(
+        "INSERT INTO suppliers (name,code,active,quote_contact_name,quote_email,created_at,updated_at) "
+        "VALUES ('UI Ready Supply','ui-ready',1,'Taylor Quotes','quotes@ui-ready.example',?,?)",
+        (now, now),
+    ).lastrowid
     c.commit()
     c.close()
 
@@ -422,7 +430,8 @@ def http_server(tmp_path, monkeypatch):
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     time.sleep(0.1)
-    yield {"port": port, "rep_id": rep_id}
+    yield {"port": port, "rep_id": rep_id, "company_id": company_id,
+           "supplier_id": supplier_id}
     srv.shutdown()
 
 
@@ -465,6 +474,56 @@ def test_http_workspace_endpoints_ok(http_server):
         status, data, _ = _req(port, "GET", path, cookie=cookie)
         assert status == 200, path
         assert isinstance(data, dict)
+
+
+def test_http_material_list_rfq_lifecycle(http_server):
+    port = http_server["port"]
+    cookie = _login(port, "uirep@corridoriq.com", "UiRep123")
+    material_payload = {
+        "companyId": http_server["company_id"],
+        "companyName": "UI Quote Plumbing",
+        "projectName": "456 Market Street",
+        "neededBy": "2026-08-24",
+        "quoteNeededBy": "2026-08-17",
+        "jobsitePostalCode": "85004",
+        "deliveryPreference": "delivery",
+        "status": "ready for review",
+        "rows": [{"qty": 4, "description": "Copper pipe", "unit": "length",
+                  "allowSubstitution": True}],
+    }
+    status, saved, _ = _req(port, "POST", "/api/material-lists", material_payload, cookie)
+    assert status == 200
+    list_id = saved["item"]["id"]
+
+    status, options, _ = _req(port, "GET", "/api/suppliers/quote-options", cookie=cookie)
+    assert status == 200
+    assert options["items"][0]["quote_email"] == "quotes@ui-ready.example"
+
+    status, prepared, _ = _req(
+        port, "POST", f"/api/material-lists/{list_id}/quote-requests",
+        {"supplier_id": http_server["supplier_id"]}, cookie,
+    )
+    assert status == 201
+    request_id = prepared["item"]["id"]
+    assert prepared["item"]["status"] == "prepared"
+
+    status, sent, _ = _req(
+        port, "PATCH", f"/api/material-quote-requests/{request_id}",
+        {"status": "sent"}, cookie,
+    )
+    assert status == 200 and sent["item"]["sent_at"]
+
+    status, response, _ = _req(
+        port, "PATCH", f"/api/material-quote-requests/{request_id}",
+        {"status": "responded", "quoted_total": 425.75,
+         "estimated_delivery_days": 2}, cookie,
+    )
+    assert status == 200 and response["item"]["quoted_total"] == 425.75
+
+    status, history, _ = _req(
+        port, "GET", f"/api/material-lists/{list_id}/quote-requests", cookie=cookie,
+    )
+    assert status == 200 and history["items"][0]["status"] == "responded"
 
 
 def test_http_me_permissions_are_json_array(http_server):
@@ -524,6 +583,24 @@ def test_http_static_pages_served(http_server):
                  "activity.html", "reports.html", "portal.css", "portal-common.js"):
         status, _, _ = _req(port, "GET", "/" + name)
         assert status == 200, name
+
+
+def test_material_list_mobile_and_action_clarity_contract():
+    html = (PROJECT_ROOT / "material-list-intake.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "material-list-intake.js").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "portal.css").read_text(encoding="utf-8")
+
+    assert 'class="grid-cards material-workspace"' in html
+    assert 'id="prepareRfqBtn"' in html and 'id="rfqSupplier"' in html
+    assert all(action in script for action in
+               ("Open Email", "Mark Sent", "Record response", "Mark declined", "Award quote"))
+    for label in ("Quantity", "Item", "Unit", "Manufacturer", "Alternates", "Catalog match", "Action"):
+        assert f'data-label="{label}"' in script
+    # Catalog results expand inside the material row instead of being clipped
+    # by the table scroller, and the two-column workspace collapses before mobile.
+    assert ".bom-table-wrap .catalog-suggestions{position:static" in css
+    assert "@media(max-width:1180px){.material-workspace{grid-template-columns:1fr}" in css
+    assert "@media(max-width:700px)" in css and ".bom-table-wrap{overflow:visible}" in css
 
 
 def test_http_reports_download_blocks_traversal(http_server):

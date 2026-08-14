@@ -193,7 +193,10 @@ CREATE TABLE IF NOT EXISTS suppliers (
     latitude                 REAL,
     longitude                REAL,
     active                   INTEGER NOT NULL DEFAULT 1,
-    updated_at               TEXT
+    updated_at               TEXT,
+    quote_contact_name       TEXT,
+    quote_email              TEXT,
+    quote_phone              TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_code ON suppliers(code);
 
@@ -914,7 +917,10 @@ CREATE TABLE IF NOT EXISTS material_lists (
     company_id          INTEGER NOT NULL REFERENCES companies(id),
     project_id          INTEGER REFERENCES projects(id),
     created_by_user_id  INTEGER NOT NULL REFERENCES users(id),
+    project_name_snapshot TEXT,
     needed_by           TEXT,
+    quote_needed_by     TEXT,
+    jobsite_postal_code TEXT,
     delivery_preference TEXT,
     notes               TEXT,
     source_name         TEXT,
@@ -941,6 +947,7 @@ CREATE TABLE IF NOT EXISTS material_list_items (
     supplier_price_snapshot     REAL,
     quantity_available_snapshot REAL,
     lead_time_days_snapshot     INTEGER,
+    allow_substitution          INTEGER NOT NULL DEFAULT 1,
     match_status                TEXT NOT NULL DEFAULT 'manual'
                                 CHECK(match_status IN ('catalog','manual')),
     created_at                  TEXT NOT NULL,
@@ -949,3 +956,36 @@ CREATE TABLE IF NOT EXISTS material_list_items (
 );
 CREATE INDEX IF NOT EXISTS idx_material_list_items_list
     ON material_list_items(material_list_id, line_number);
+
+-- Manual/email-first supplier RFQ workflow.  Each request snapshots the
+-- recipient and generated message so the sales record remains auditable even
+-- when supplier contact details change later.
+CREATE TABLE IF NOT EXISTS supplier_quote_requests (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id         INTEGER NOT NULL REFERENCES organizations(id),
+    material_list_id        INTEGER NOT NULL REFERENCES material_lists(id) ON DELETE CASCADE,
+    supplier_id             INTEGER NOT NULL REFERENCES suppliers(id),
+    requested_by_user_id    INTEGER NOT NULL REFERENCES users(id),
+    status                  TEXT NOT NULL DEFAULT 'prepared'
+                            CHECK(status IN ('prepared','sent','responded','declined','awarded','cancelled')),
+    recipient_name          TEXT,
+    recipient_email         TEXT,
+    subject                 TEXT NOT NULL,
+    message                 TEXT NOT NULL,
+    quote_needed_by         TEXT,
+    jobsite_postal_code     TEXT,
+    follow_up_at            TEXT,
+    sent_at                 TEXT,
+    responded_at            TEXT,
+    quoted_total            REAL,
+    estimated_delivery_days INTEGER,
+    valid_until             TEXT,
+    response_notes          TEXT,
+    created_at              TEXT NOT NULL,
+    updated_at              TEXT NOT NULL,
+    UNIQUE(material_list_id, supplier_id)
+);
+CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_org_status
+    ON supplier_quote_requests(organization_id, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_list
+    ON supplier_quote_requests(material_list_id, updated_at DESC);
