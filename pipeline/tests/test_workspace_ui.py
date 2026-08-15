@@ -81,12 +81,13 @@ def _project(c, company_id, score=90, lifecycle="permitting", days_ago=1):
                     "VALUES ('phoenix_az',?,?, 'PHOENIX','AZ','issued',?,?,?,?)",
                     (f"P{company_id}-{days_ago}", "123 Main St", company_id, d, now, now))
     pid = cur.lastrowid
-    c.execute("INSERT INTO projects (permit_id, jurisdiction, contractor_company_id, "
-              "project_category, project_lifecycle, opportunity_score, opportunity_date, "
-              "opportunity_timing, estimated_material_value) "
-              "VALUES (?, 'phoenix_az', ?, 'commercial', ?, ?, ?, 'immediate', 5000)",
-              (pid, company_id, lifecycle, score, d))
+    project = c.execute("INSERT INTO projects (permit_id, jurisdiction, contractor_company_id, "
+                        "project_category, project_lifecycle, opportunity_score, opportunity_date, "
+                        "opportunity_timing, estimated_material_value) "
+                        "VALUES (?, 'phoenix_az', ?, 'commercial', ?, ?, ?, 'immediate', 5000)",
+                        (pid, company_id, lifecycle, score, d))
     c.commit()
+    return project.lastrowid
 
 
 @pytest.fixture()
@@ -181,6 +182,11 @@ def test_admin_dashboard_is_organization_scoped_not_assignment(env):
     orphan = _company(c, "Orphan Mechanical")
     _intel(c, orphan, "High", 80)
     _project(c, env["co1"], score=85, lifecycle="Permit Issued")
+    c.execute("UPDATE companies SET main_phone='602-555-0110', lead_type='verified_contractor' WHERE id=?",
+              (env["co1"],))
+    c.execute("UPDATE crm_company_relationships SET lead_type='verified_contractor' WHERE company_id=?",
+              (env["co1"],))
+    c.commit()
 
     dash = crm_admin.admin_dashboard(c, env["admin"])
     assert dash["scope"] == "organization"
@@ -190,6 +196,9 @@ def test_admin_dashboard_is_organization_scoped_not_assignment(env):
     assert k["total_projects"] >= 1
     assert k["total_permits"] >= 1
     assert k["companies_awaiting_assignment"] >= 1
+    assert k["verified_contractors"] == 1
+    assert k["contact_ready_contractors"] == 1
+    assert k["contractors_needing_enrichment"] == 0
     assert k["active_employees"] >= 4
     # Must never look like a personal assignment dashboard.
     assert "my_companies" not in k
@@ -344,20 +353,60 @@ def test_opportunities_default_to_verified_contractors_and_separate_research(env
     assert all_queues["total"] == 2
 
 
-def test_project_records_ui_exposes_lead_integrity_queues():
+def test_opportunities_return_real_crm_pipeline_fields(env):
+    c = env["conn"]
+    project_id = _project(c, env["co1"], score=92, lifecycle="Permit Issued")
+    c.execute("UPDATE companies SET main_phone='602-555-0100', lead_type='verified_contractor' WHERE id=?",
+              (env["co1"],))
+    c.execute("UPDATE crm_company_relationships SET lead_type='verified_contractor' WHERE company_id=?",
+              (env["co1"],))
+    now = _now()
+    c.execute(
+        "INSERT INTO material_lists (organization_id,company_id,project_id,created_by_user_id,"
+        "status,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+        (env["org"], env["co1"], project_id, env["ids"]["rep"], "draft", now, now),
+    )
+    c.commit()
+    crm.update_relationship(c, env["admin"], env["co1"], {"relationship_status": "qualified"})
+
+    result = crm.opportunities(c, env["admin"], {"active_only": "1"})
+    item = result["items"][0]
+    assert item["relationship_status"] == "qualified"
+    assert item["assigned_user_id"] == env["ids"]["rep"]
+    assert item["assigned_to"]
+    assert item["has_contact_info"] == 1
+    assert item["material_list_count"] == 1
+    assert item["latest_material_list_status"] == "draft"
+    assert item["quote_request_count"] == 0
+
+    crm.update_relationship(c, env["admin"], env["co1"], {"relationship_status": "lost"})
+    assert crm.opportunities(c, env["admin"], {"active_only": "1"})["total"] == 0
+
+
+def test_project_records_ui_is_verified_contractor_only():
     html = (PROJECT_ROOT / "opportunities.html").read_text(encoding="utf-8")
     script = (PROJECT_ROOT / "opportunities.js").read_text(encoding="utf-8")
-    assert 'id="flead"' in html
-    for lead_type in (
-        "verified_contractor",
-        "specifier_architect_engineer",
-        "owner_developer",
-        "unverified_permit_contact",
-    ):
-        assert lead_type in html
+    assert 'id="flead"' not in html
+    assert "Verified contractor projects only" in html
+    assert 'href="my-companies.html"' in html
+    assert "Architect / Engineer research" not in html
     assert 'lead_type: "verified_contractor"' in script
     assert "classification_ready" in script
     assert "ApplyCorridorIQLeadIntegrity.bat" in script
+
+
+def test_opportunity_board_uses_real_status_assignment_and_material_signals():
+    html = (PROJECT_ROOT / "opportunity-board.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "opportunity-board.js").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "opportunity-board.css").read_text(encoding="utf-8")
+    assert 'value="unassigned"' in html
+    for field in ("relationship_status", "assigned_to",
+                  "material_list_count", "quote_request_count", "has_contact_info"):
+        assert field in script
+    assert 'active_only: "1"' in script
+    assert "crm.relationships.update" in script
+    assert "/relationship" in script
+    assert "@media(max-width:900px){.board-filters{grid-template-columns:1fr}" in css
 
 
 def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
@@ -371,8 +420,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-lead-integrity-r11" in launcher
-    assert 'BUILD_ID = "2026-08-15-lead-integrity-r11"' in server
+    assert "2026-08-15-crm-stabilization-r13" in launcher
+    assert 'BUILD_ID = "2026-08-15-crm-stabilization-r13"' in server
 
 
 # --------------------------------------------------------------------------
@@ -492,6 +541,11 @@ def http_server(tmp_path, monkeypatch):
                               must_change_password=False)
     company_id = _company(c, "UI Quote Plumbing")
     crm.assign_company(c, _ctx(c, admin_id), company_id, rep_id, reason="HTTP RFQ test")
+    project_id = _project(c, company_id, score=91, lifecycle="Permit Issued")
+    c.execute("UPDATE companies SET main_phone='602-555-0199', lead_type='verified_contractor' WHERE id=?",
+              (company_id,))
+    c.execute("UPDATE crm_company_relationships SET lead_type='verified_contractor' WHERE company_id=?",
+              (company_id,))
     now = _now()
     supplier_id = c.execute(
         "INSERT INTO suppliers (name,code,active,quote_contact_name,quote_email,created_at,updated_at) "
@@ -507,7 +561,7 @@ def http_server(tmp_path, monkeypatch):
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     time.sleep(0.1)
-    yield {"port": port, "rep_id": rep_id, "company_id": company_id,
+    yield {"port": port, "rep_id": rep_id, "company_id": company_id, "project_id": project_id,
            "supplier_id": supplier_id}
     srv.shutdown()
 
@@ -669,8 +723,15 @@ def test_material_list_mobile_and_action_clarity_contract():
 
     assert 'class="grid-cards material-workspace"' in html
     assert 'id="prepareRfqBtn"' in html and 'id="rfqSupplier"' in html
+    assert 'accept=".csv,text/csv"' in html
+    assert "Automatic import supports CSV" in html
+    assert "PDF, Excel, CSV, photo, or screenshot" not in html
+    assert 'id="draftSaveState"' in html
     assert all(action in script for action in
                ("Open Email", "Mark Sent", "Record response", "Mark declined", "Award quote"))
+    assert "scheduleLocalSave" in script
+    assert "persistLocalDraft" in script
+    assert "CIQ.guardUnsaved(() => dirty)" in script
     for label in ("Quantity", "Item", "Unit", "Manufacturer", "Alternates", "Catalog match", "Action"):
         assert f'data-label="{label}"' in script
     # Catalog results render in a body-level portal so table scrolling cannot
@@ -770,6 +831,40 @@ def test_login_form_browser_flow(http_server):
         if "Executable doesn't exist" in str(exc) or "chromium" in str(exc).lower():
             pytest.skip(f"Playwright browser unavailable: {exc}")
         raise
+
+
+def test_opportunity_board_browser_flow_uses_real_crm_state(http_server):
+    """The board must show a reachable verified contractor and persist an
+    inline CRM status change into the correct stage."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    base = f"http://127.0.0.1:{http_server['port']}"
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            pytest.skip("Chromium not installed for Playwright")
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(base + "/login.html")
+        page.fill("#email", "uiadmin@corridoriq.com")
+        page.fill("#password", "UiAdmin123")
+        page.click("#loginBtn")
+        page.wait_for_url("**/admin-dashboard.html")
+        page.goto(base + "/opportunity-board.html", wait_until="networkidle")
+
+        card = page.locator(".op-card")
+        assert card.count() == 1
+        assert "UI Quote Plumbing" in card.inner_text()
+        assert "Contact ready" in card.inner_text()
+        assert "Assigned" in card.inner_text()
+        card.locator("select[data-status-company]").select_option("qualified")
+        page.wait_for_selector('[data-stage="qualified"] .op-card', timeout=8000)
+        assert "Qualified" in page.locator('[data-stage="qualified"] .op-card').inner_text()
+        assert errors == []
+        browser.close()
 
 
 def test_cart_dropdown_checkout_mouse_touch_and_keyboard(http_server):
@@ -917,6 +1012,14 @@ def test_material_catalog_popup_uses_body_portal_and_all_input_modes(http_server
         popup.wait_for(state="visible")
         page.get_by_label("Contractor / company").click()
         assert popup.is_hidden()
+        page.get_by_label("Contractor / company").fill("Autosave Plumbing")
+        page.get_by_label("Project / job address").fill("500 Saved Draft Way")
+        field.fill("Copper draft survives navigation")
+        page.wait_for_function("document.querySelector('#draftSaveState').textContent.includes('Saved on this device')")
+        page.reload(wait_until="networkidle")
+        assert page.get_by_label("Contractor / company").input_value() == "Autosave Plumbing"
+        assert page.get_by_label("Project / job address").input_value() == "500 Saved Draft Way"
+        assert page.get_by_label("Description").input_value() == "Copper draft survives navigation"
         assert errors == []
         desktop.close()
 

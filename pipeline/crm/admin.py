@@ -180,19 +180,42 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
 
     new_submitted = _n(
         "SELECT COUNT(*) AS n FROM projects pr JOIN permits p ON p.id=pr.permit_id "
+        "JOIN companies c ON c.id=pr.contractor_company_id "
+        "JOIN crm_company_relationships r ON r.company_id=c.id AND r.organization_id=? "
         "WHERE pr.project_lifecycle IN ('Application Submitted','Plan Review') "
+        "AND COALESCE(r.lead_type,c.lead_type)='verified_contractor' "
         "AND (p.issued_date IS NULL OR p.issued_date='') "
         "AND pr.opportunity_score >= ? "
         "AND substr(COALESCE(p.first_seen_at, p.last_updated_at, ''), 1, 10) = ?",
-        (threshold, today))
+        (org_id, threshold, today))
     new_issued = _n(
         "SELECT COUNT(*) AS n FROM projects pr JOIN permits p ON p.id=pr.permit_id "
+        "JOIN companies c ON c.id=pr.contractor_company_id "
+        "JOIN crm_company_relationships r ON r.company_id=c.id AND r.organization_id=? "
         "WHERE pr.project_lifecycle='Permit Issued' "
+        "AND COALESCE(r.lead_type,c.lead_type)='verified_contractor' "
         "AND substr(COALESCE(p.issued_date, p.last_updated_at, ''), 1, 10) = ?",
-        (today,))
+        (org_id, today))
     high_priority = _n(
-        "SELECT COUNT(*) AS n FROM company_intelligence "
-        "WHERE company_priority_tier IN ('Critical','High')")
+        "SELECT COUNT(*) AS n FROM company_intelligence ci "
+        "JOIN companies c ON c.id=ci.company_id "
+        "JOIN crm_company_relationships r ON r.company_id=c.id AND r.organization_id=? "
+        "WHERE ci.company_priority_tier IN ('Critical','High') "
+        "AND COALESCE(r.lead_type,c.lead_type)='verified_contractor'",
+        (org_id,))
+    verified_contractors = _n(
+        "SELECT COUNT(*) AS n FROM crm_company_relationships r JOIN companies c ON c.id=r.company_id "
+        "WHERE r.organization_id=? AND COALESCE(r.lead_type,c.lead_type)='verified_contractor'",
+        (org_id,))
+    contact_ready_contractors = _n(
+        "SELECT COUNT(*) AS n FROM crm_company_relationships r JOIN companies c ON c.id=r.company_id "
+        "WHERE r.organization_id=? AND COALESCE(r.lead_type,c.lead_type)='verified_contractor' AND ("
+        "TRIM(COALESCE(c.main_phone,''))<>'' OR TRIM(COALESCE(c.main_email,''))<>'' OR "
+        "TRIM(COALESCE(c.website,''))<>'' OR EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id=c.id "
+        "AND (TRIM(COALESCE(ct.phone,''))<>'' OR TRIM(COALESCE(ct.mobile_phone,''))<>'' OR "
+        "TRIM(COALESCE(ct.email,''))<>'')))",
+        (org_id,))
+    contractors_needing_enrichment = max(0, verified_contractors - contact_ready_contractors)
     awaiting_assignment = _n(
         "SELECT COUNT(*) AS n FROM companies c "
         "WHERE c.lifecycle_state='active' AND NOT EXISTS ("
@@ -218,11 +241,9 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
     simple = pipeline_runs.employee_status(conn)
     summary = refresh.get("summary") or {}
 
-    # Prefer today's live counts; fall back to latest morning-refresh summary.
-    if new_submitted == 0 and summary.get("new_submitted_opportunities") is not None:
-        new_submitted = int(summary["new_submitted_opportunities"] or 0)
-    if new_issued == 0 and summary.get("new_issued_permits") is not None:
-        new_issued = int(summary["new_issued_permits"] or 0)
+    # Sales KPIs stay tied to live, verified-contractor records. The broader
+    # ingestion summary remains available below for operational diagnostics,
+    # but it must never inflate the actionable sales counts.
 
     recent_pipeline = [
         {
@@ -245,12 +266,14 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
                    pr.project_category
             FROM projects pr
             JOIN permits p ON p.id = pr.permit_id
-            LEFT JOIN companies c ON c.id = COALESCE(pr.contractor_company_id, p.contractor_company_id)
+            JOIN companies c ON c.id = pr.contractor_company_id
+            JOIN crm_company_relationships r ON r.company_id=c.id AND r.organization_id=?
             WHERE pr.opportunity_score IS NOT NULL
+              AND COALESCE(r.lead_type,c.lead_type)='verified_contractor'
             ORDER BY COALESCE(pr.opportunity_date, p.last_updated_at) DESC
             LIMIT ?
             """,
-            (10,),
+            (org_id, 10),
         ).fetchall()
     ]
 
@@ -278,6 +301,9 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
             "new_submitted_opportunities": new_submitted,
             "new_issued_permits": new_issued,
             "high_priority_opportunities": high_priority,
+            "verified_contractors": verified_contractors,
+            "contact_ready_contractors": contact_ready_contractors,
+            "contractors_needing_enrichment": contractors_needing_enrichment,
             "companies_awaiting_assignment": awaiting_assignment,
             "estimates_awaiting_review": estimates_awaiting,
             "estimates_approved_for_supplier": estimates_approved,

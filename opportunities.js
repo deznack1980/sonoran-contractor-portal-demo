@@ -96,19 +96,30 @@
     if (!user) return;
     canEdit = CIQ.hasPerm("crm.activities.create");
     const lc = document.getElementById("flifecycle");
-    ["Application Submitted", "Plan Review", "Permit Issued", "Construction Active", "Inspection", "Completed"].forEach((v) => {
-      const o = document.createElement("option"); o.value = v; o.textContent = v; lc.appendChild(o);
+    [["submitted", "Application / Plan Review"], ["Permit Issued", "Permit Issued"],
+     ["Construction Active", "Construction Active"], ["Inspection", "Inspection"],
+     ["Finaled", "Finaled"], ["Closed", "Closed"]].forEach(([value, label]) => {
+      const o = document.createElement("option"); o.value = value; o.textContent = label; lc.appendChild(o);
     });
     const fq = document.getElementById("fq");
-    const lead = document.getElementById("flead");
-    const requestedLead = new URLSearchParams(location.search).get("lead_type");
-    const allowedLeads = [...lead.options].map((option) => option.value);
-    if (requestedLead && allowedLeads.includes(requestedLead)) {
-      filters.lead_type = requestedLead;
-      lead.value = requestedLead;
+    const query = new URLSearchParams(location.search);
+    const requestedLifecycle = query.get("lifecycle");
+    const requestedAge = query.get("age_days");
+    const requestedScore = query.get("score_min");
+    const requestedContact = query.get("contact_info");
+    if (requestedLifecycle && [...lc.options].some((option) => option.value === requestedLifecycle)) {
+      filters.lifecycle = requestedLifecycle; lc.value = requestedLifecycle;
+    }
+    if (requestedAge !== null && [...document.getElementById("fage").options].some((option) => option.value === requestedAge)) {
+      filters.age_days = requestedAge; document.getElementById("fage").value = requestedAge;
+    }
+    if (requestedScore && [...document.getElementById("fscore").options].some((option) => option.value === requestedScore)) {
+      filters.score_min = requestedScore; document.getElementById("fscore").value = requestedScore;
+    }
+    if (requestedContact && [...document.getElementById("fcontact").options].some((option) => option.value === requestedContact)) {
+      filters.contact_info = requestedContact; document.getElementById("fcontact").value = requestedContact;
     }
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
-    lead.addEventListener("change", () => { filters.lead_type = lead.value; page = 1; load(); });
     lc.addEventListener("change", () => { filters.lifecycle = lc.value; page = 1; load(); });
     document.getElementById("fscore").addEventListener("change", (e) => { filters.score_min = e.target.value; page = 1; load(); });
     document.getElementById("fcontact").addEventListener("change", (e) => { filters.contact_info = e.target.value; page = 1; load(); });

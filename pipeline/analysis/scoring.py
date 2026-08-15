@@ -8,6 +8,8 @@ Normalization is applied to *derived* status/type values only — raw
 ``status`` and ``permit_type`` on the permit row are never overwritten.
 """
 
+from __future__ import annotations
+
 import math
 from datetime import datetime, timezone
 

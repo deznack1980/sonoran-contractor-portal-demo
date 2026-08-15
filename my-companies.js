@@ -37,6 +37,9 @@
     document.getElementById("fcontacted").value = "";
     document.getElementById("fmuni").value = "";
     Object.assign(filters, def ? def[2] : {});
+    // Execution views stay contractor-only unless the selected research view
+    // explicitly requests another lead type. Keep the UI and API scope aligned.
+    if (!filters.lead_type) filters.lead_type = "verified_contractor";
     document.getElementById("ffollowup").value = filters.followup || "";
     document.getElementById("fstatus").value = filters.status || "";
     document.getElementById("flead").value = filters.lead_type || "all";
@@ -163,7 +166,16 @@
     if (q) { filters.q = q; document.getElementById("fq").value = q; }
     if (status) { filters.status = status; document.getElementById("fstatus").value = status; }
     if (tier) { filters.tier = tier; document.getElementById("ftier").value = tier; }
-    if (view === "followup") { filters.followup = "due"; document.getElementById("ffollowup").value = "due"; renderViews("followup"); }
+    const requestedView = VIEWS.find((item) => item[0] === view);
+    if (requestedView) {
+      Object.assign(filters, requestedView[2]);
+      if (!filters.lead_type) filters.lead_type = "verified_contractor";
+      document.getElementById("flead").value = filters.lead_type;
+      document.getElementById("fstatus").value = filters.status || "";
+      document.getElementById("ffollowup").value = filters.followup || "";
+      document.getElementById("fcontacted").value = filters.contacted || "";
+      renderViews(view);
+    }
     else if (view === "overdue") { filters.followup = "overdue"; document.getElementById("ffollowup").value = "overdue"; renderViews(null); }
     else if (!q && !status && !tier) { renderViews("verified"); }
     else renderViews(null);

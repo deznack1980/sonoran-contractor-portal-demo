@@ -20,7 +20,7 @@
     </div>
 
     <div class="card card-pad" style="margin-bottom:16px">
-      <div class="stack" style="display:grid;grid-template-columns:minmax(220px,1fr) 180px 180px;gap:10px">
+      <div class="board-filters">
         <input id="boardSearch" type="search" placeholder="Search contractor, address, permit, city…" />
         <select id="boardScore">
           <option value="60">Score 60+</option>
@@ -29,12 +29,14 @@
           <option value="90">Score 90+</option>
         </select>
         <select id="boardOwner">
-          <option value="">All assigned work</option>
-          <option value="mine">My opportunities</option>
+          <option value="">All contractor opportunities</option>
+          <option value="mine">Assigned to me</option>
+          <option value="unassigned">Unassigned</option>
         </select>
       </div>
     </div>
 
+    <div id="boardNotice" class="muted" style="font-size:12px;margin:-6px 0 12px"></div>
     <div id="boardSummary" class="kpi-grid" style="margin-bottom:18px"></div>
     <div id="board" class="crm-board"></div>
   </template>
