@@ -12,6 +12,8 @@ from pipeline.company_resolution.lead_role_correction import (
     rollback_lead_role_correction,
 )
 from pipeline.company_resolution.normalize import normalize_company_name
+from pipeline.company_resolution.metrics import compute_company_metrics
+from pipeline.company_resolution.timeline import rebuild_company_timeline
 from pipeline.config.settings import SCHEMA_PATH
 from pipeline.db.database import migrate_schema
 from pipeline.crm.service import list_my_companies
@@ -159,6 +161,50 @@ def test_migration_rebuilds_links_classifies_crm_and_is_reversible(conn):
     assert rollback_lead_role_correction(conn) == 4
     assert conn.execute("SELECT contractor_company_id FROM permits WHERE id=?", (p_specifier,)).fetchone()[0] == specifier
     assert conn.execute("SELECT general_contractor_name FROM permits WHERE id=?", (p_owner,)).fetchone()[0] == "Desert Properties LLC"
+
+
+def test_todd_associates_professional_is_removed_from_contractor_derived_data(conn):
+    todd = _company(conn, "Todd & Associates")
+    permit_id = _permit(
+        conn,
+        "phoenix_az",
+        "PHX-TODD-1",
+        {"PROFESS_NAME": "Todd & Associates", "PERMIT_NAME": "Tenant Improvement"},
+        "Todd & Associates",
+        todd,
+    )
+    compute_company_metrics(conn)
+    rebuild_company_timeline(conn)
+    assert conn.execute(
+        "SELECT COUNT(*) FROM company_intelligence WHERE company_id=?", (todd,)
+    ).fetchone()[0] == 1
+    assert conn.execute(
+        "SELECT COUNT(*) FROM company_activity WHERE company_id=? AND source='permits'",
+        (todd,),
+    ).fetchone()[0] >= 1
+
+    apply_lead_role_correction(conn)
+    compute_company_metrics(conn)
+    rebuild_company_timeline(conn, replace_permit_events=True)
+
+    permit = conn.execute(
+        "SELECT contractor_company_id,permit_professional_name,lead_type "
+        "FROM permits WHERE id=?",
+        (permit_id,),
+    ).fetchone()
+    assert permit["contractor_company_id"] is None
+    assert permit["permit_professional_name"] == "Todd & Associates"
+    assert permit["lead_type"] == "unverified_permit_contact"
+    assert conn.execute(
+        "SELECT lead_type FROM crm_company_relationships WHERE company_id=?", (todd,)
+    ).fetchone()[0] == "unverified_permit_contact"
+    assert conn.execute(
+        "SELECT COUNT(*) FROM company_intelligence WHERE company_id=?", (todd,)
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM company_activity WHERE company_id=? AND source='permits'",
+        (todd,),
+    ).fetchone()[0] == 0
 
 
 def test_explicit_field_placeholder_is_preserved_but_never_linked(conn):
