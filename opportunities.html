@@ -10,6 +10,13 @@
   <template id="pageContent">
     <div class="filters">
       <input type="search" id="fq" placeholder="Search address, city, company…" />
+      <select id="flead" aria-label="Lead queue">
+        <option value="verified_contractor">Verified contractors</option>
+        <option value="specifier_architect_engineer">Architect / Engineer research</option>
+        <option value="owner_developer">Owner / Developer research</option>
+        <option value="unverified_permit_contact">Unverified permit contacts</option>
+        <option value="all">All lead types</option>
+      </select>
       <select id="flifecycle"><option value="">All stages</option></select>
       <select id="fscore">
         <option value="">Any score</option>
