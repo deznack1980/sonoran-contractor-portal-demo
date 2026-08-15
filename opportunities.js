@@ -1,8 +1,21 @@
 /* Opportunities — high-scoring projects across assigned companies. */
 (function () {
-  let page = 1; const filters = { age_days: "365" }; let canEdit = false;
+  let page = 1;
+  const filters = { age_days: "365", lead_type: "verified_contractor" };
+  let canEdit = false;
 
   function truncate(s, n) { s = s || ""; return s.length > n ? s.slice(0, n) + "…" : s; }
+
+  function leadMeta(value) {
+    const leadType = value || "unverified_permit_contact";
+    const labels = {
+      verified_contractor: ["Verified contractor", "green"],
+      specifier_architect_engineer: ["Architect / Engineer", "blue"],
+      owner_developer: ["Owner / Developer", "amber"],
+      unverified_permit_contact: ["Unverified contact", "slate"],
+    };
+    return labels[leadType] || [CIQ.titleCase(leadType.replaceAll("_", " ")), "slate"];
+  }
 
   function ageMeta(p) {
     const raw = p.opportunity_date || p.last_updated_at || p.issued_date || p.first_seen_at;
@@ -24,6 +37,7 @@
           <div class="cc-loc"><a href="sales-company-profile.html?id=${p.company_id}">${CIQ.esc(p.display_name)}</a> · ${CIQ.esc(p.jurisdiction || p.city || "")}</div></div>
         <div class="stack" style="align-items:flex-end;gap:5px">
           <span class="score-chip">${p.opportunity_score != null ? Math.round(p.opportunity_score) : "—"}</span>
+          <span class="badge ${leadMeta(p.lead_type)[1]}">${CIQ.esc(leadMeta(p.lead_type)[0])}</span>
           <span class="badge ${age.cls}">${CIQ.esc(age.label)}</span>
           <span class="badge ${p.has_contact_info ? "green" : "amber"}">${p.has_contact_info ? "Contact available" : "No contact data"}</span>
         </div>
@@ -36,6 +50,7 @@
         <div><span>Company permit history</span>${p.company_permit_count != null ? p.company_permit_count : "—"}</div>
         <div><span>Est. value</span>${p.estimated_material_value != null ? CIQ.money(p.estimated_material_value) : "—"}</div>
       </div>
+      ${p.why_this_lead ? `<div class="cc-reason"><strong>Why this lead:</strong> ${CIQ.esc(truncate(p.why_this_lead, 160))}</div>` : ""}
       ${p.description ? `<div class="cc-reason">${CIQ.esc(truncate(p.description, 120))}</div>` : ""}
       <div class="cc-quick">
         <a class="btn btn-sm btn-ghost" href="sales-company-profile.html?id=${p.company_id}">View company</a>
@@ -54,6 +69,12 @@
     let data;
     try { data = await CIQ.api.get("/api/sales/opportunities?" + params.toString()); }
     catch (e) { list.innerHTML = CIQ.errorBanner(e.message); return; }
+    if (!data.classification_ready && filters.lead_type !== "all") {
+      list.innerHTML = CIQ.emptyState({ icon: "⚠", title: "Lead classification required",
+        text: "Run ApplyCorridorIQLeadIntegrity.bat once, then reopen Project Records. Unverified permit professionals are intentionally blocked from the contractor queue." });
+      document.getElementById("pager").innerHTML = "";
+      return;
+    }
     if (!data.items.length) {
       list.innerHTML = CIQ.emptyState({ icon: "◎", title: "No opportunities match",
         text: "Projects tied to your assigned companies will appear here." });
@@ -79,7 +100,15 @@
       const o = document.createElement("option"); o.value = v; o.textContent = v; lc.appendChild(o);
     });
     const fq = document.getElementById("fq");
+    const lead = document.getElementById("flead");
+    const requestedLead = new URLSearchParams(location.search).get("lead_type");
+    const allowedLeads = [...lead.options].map((option) => option.value);
+    if (requestedLead && allowedLeads.includes(requestedLead)) {
+      filters.lead_type = requestedLead;
+      lead.value = requestedLead;
+    }
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
+    lead.addEventListener("change", () => { filters.lead_type = lead.value; page = 1; load(); });
     lc.addEventListener("change", () => { filters.lifecycle = lc.value; page = 1; load(); });
     document.getElementById("fscore").addEventListener("change", (e) => { filters.score_min = e.target.value; page = 1; load(); });
     document.getElementById("fcontact").addEventListener("change", (e) => { filters.contact_info = e.target.value; page = 1; load(); });
