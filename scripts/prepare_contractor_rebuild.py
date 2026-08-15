@@ -10,8 +10,15 @@ import argparse
 import hashlib
 import json
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Support both documented Windows invocation styles:
+# ``python scripts/prepare_contractor_rebuild.py`` and ``python -m scripts...``.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from pipeline.config import settings
 from pipeline.contractors.audit import contractor_audit_snapshot, render_markdown

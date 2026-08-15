@@ -4,9 +4,20 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
+import sys
 
-from pipeline.config.settings import SCHEMA_PATH
+from pipeline.config.settings import PROJECT_ROOT, SCHEMA_PATH
 from scripts.prepare_contractor_rebuild import prepare
+
+
+def test_direct_script_invocation_can_import_pipeline():
+    completed = subprocess.run(
+        [sys.executable, "scripts/prepare_contractor_rebuild.py", "--help"],
+        cwd=PROJECT_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert completed.returncode == 0
+    assert "Back up and audit before contractor rebuilding" in completed.stdout
 
 
 def test_preflight_creates_verified_backup_and_audit_without_rebuilding(tmp_path):
