@@ -143,6 +143,17 @@ def compute_company_metrics(conn: sqlite3.Connection) -> int:
             elif d90_prev <= opp < d90:
                 m["count_prev_90"] += 1
 
+    # Remove derived metrics that no longer have any project-role evidence.
+    # This matters after lead-role correction unlinks architects, engineers, and
+    # generic permit professionals from contractor_company_id.
+    role_match = " OR ".join(
+        f"pr.{column}=company_intelligence.company_id" for column in _ROLE_COLUMNS
+    )
+    conn.execute(
+        f"DELETE FROM company_intelligence WHERE NOT EXISTS "
+        f"(SELECT 1 FROM projects pr WHERE {role_match})"
+    )
+
     model_version = COMPANY_METRICS_MODEL_VERSION
     calculated_at = now.isoformat(timespec="seconds")
     written = 0
