@@ -9,17 +9,21 @@
 </head>
 <body>
   <template id="pageContent">
-    <div class="page-head">
+    <section class="pipeline-hero">
       <div>
-        <div class="muted" style="font-size:13px">Move from permit signal to contractor action</div>
+        <span class="eyebrow">REVENUE EXECUTION</span>
+        <h2>Turn verified project signals into action</h2>
+        <p>Prioritized contractor opportunities with contact readiness, likely material scope, and the next commercial step in one view.</p>
       </div>
-      <div class="stack" style="flex-direction:row;gap:8px;flex-wrap:wrap">
-        <a class="btn btn-sm" href="opportunities.html">List View</a>
-        <a class="btn btn-sm btn-primary" href="material-list-intake.html">New Material List</a>
+      <div class="pipeline-hero-actions">
+        <a class="btn btn-dark" href="opportunities.html">Project Records</a>
+        <a class="btn btn-primary" href="material-list-intake.html">New Material List</a>
       </div>
-    </div>
+    </section>
 
-    <div class="card card-pad" style="margin-bottom:16px">
+    <div id="boardSummary" class="pipeline-kpis"></div>
+
+    <section class="pipeline-controls" aria-label="Opportunity pipeline controls">
       <div class="board-filters">
         <input id="boardSearch" type="search" placeholder="Search contractor, address, permit, city…" />
         <select id="boardScore">
@@ -33,12 +37,21 @@
           <option value="mine">Assigned to me</option>
           <option value="unassigned">Unassigned</option>
         </select>
+        <select id="boardContact">
+          <option value="">Any contact status</option>
+          <option value="available">Contact ready</option>
+          <option value="missing">Needs enrichment</option>
+        </select>
+        <button id="boardReset" class="btn btn-ghost" type="button">Reset</button>
       </div>
-    </div>
+      <div id="boardStageNav" class="pipeline-stage-nav" role="tablist" aria-label="Pipeline stage"></div>
+    </section>
 
-    <div id="boardNotice" class="muted" style="font-size:12px;margin:-6px 0 12px"></div>
-    <div id="boardSummary" class="kpi-grid" style="margin-bottom:18px"></div>
-    <div id="board" class="crm-board"></div>
+    <div class="pipeline-queue-head">
+      <div><span class="eyebrow">PRIORITY QUEUE</span><h3 id="queueTitle">All active opportunities</h3></div>
+      <div id="boardNotice" class="pipeline-result-count"></div>
+    </div>
+    <div id="board" class="pipeline-queue"></div>
   </template>
   <script src="portal-common.js"></script>
   <script src="opportunity-board.js"></script>

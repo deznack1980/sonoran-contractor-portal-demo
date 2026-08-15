@@ -417,13 +417,22 @@ def test_opportunity_board_uses_real_status_assignment_and_material_signals():
     script = (PROJECT_ROOT / "opportunity-board.js").read_text(encoding="utf-8")
     css = (PROJECT_ROOT / "opportunity-board.css").read_text(encoding="utf-8")
     assert 'value="unassigned"' in html
+    assert 'id="boardContact"' in html
+    assert 'id="boardStageNav"' in html
+    assert 'class="pipeline-queue"' in html
     for field in ("relationship_status", "assigned_to",
                   "material_list_count", "quote_request_count", "has_contact_info"):
         assert field in script
+    for signal in ("estimated_material_value", "estimated_plumbing_scope",
+                   "activeStage", "Build Material List", "Contact-ready in view"):
+        assert signal in script
     assert 'active_only: "1"' in script
     assert "crm.relationships.update" in script
     assert "/relationship" in script
-    assert "@media(max-width:900px){.board-filters{grid-template-columns:1fr}" in css
+    assert ".pipeline-opportunity" in css
+    assert "@media(max-width:900px)" in css
+    assert "@media(max-width:620px)" in css
+    assert ".crm-board" not in css
 
 
 def test_company_executive_brief_is_evidence_based_printable_and_allowlisted():
@@ -949,8 +958,8 @@ def test_login_form_browser_flow(http_server):
 
 
 def test_opportunity_board_browser_flow_uses_real_crm_state(http_server):
-    """The board must show a reachable verified contractor and persist an
-    inline CRM status change into the correct stage."""
+    """The executive queue must show real signals, persist status changes,
+    filter by stage, and remain actionable on a phone-sized viewport."""
     pytest.importorskip("playwright.sync_api")
     from playwright.sync_api import sync_playwright
 
@@ -975,9 +984,22 @@ def test_opportunity_board_browser_flow_uses_real_crm_state(http_server):
         assert "UI Quote Plumbing" in card.inner_text()
         assert "Contact ready" in card.inner_text()
         assert "Assigned" in card.inner_text()
+        assert "Estimated material opportunity" in card.inner_text()
+        assert "Commercial Fixtures, Backflow, Valves" in card.inner_text()
+        assert page.get_by_role("link", name="Build Material List").is_visible()
         card.locator("select[data-status-company]").select_option("qualified")
-        page.wait_for_selector('[data-stage="qualified"] .op-card', timeout=8000)
-        assert "Qualified" in page.locator('[data-stage="qualified"] .op-card').inner_text()
+        page.wait_for_selector('.op-card[data-stage="qualified"]', timeout=8000)
+        page.locator('[data-stage-filter="qualified"]').click()
+        assert page.locator('.op-card[data-stage="qualified"]').count() == 1
+        assert page.locator("#queueTitle").inner_text() == "Qualified"
+
+        page.set_viewport_size({"width": 390, "height": 800})
+        page.locator('.op-card[data-stage="qualified"]').scroll_into_view_if_needed()
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        mobile_card = page.locator('.op-card[data-stage="qualified"]')
+        card_box = mobile_card.bounding_box()
+        assert card_box and card_box["x"] >= 0 and card_box["x"] + card_box["width"] <= 390
+        assert mobile_card.get_by_role("link", name="Build Material List").is_visible()
         assert errors == []
         browser.close()
 
