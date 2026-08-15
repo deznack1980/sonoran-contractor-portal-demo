@@ -146,18 +146,19 @@ on Windows.)
 - **Live dashboard:** `dashboard.html` / `dashboard.js`, reading `data/exports/*.json`
 - **Full permit archive (CSV):** `python pipeline/run.py export-permits` → `data/exports/all_permits.csv`
 - **SQLite source of truth:** `pipeline/db/corridoriq.db`
-- **Contractor matching across jurisdictions:** `contractors.html` / `contractors.js`, reading
-  `data/exports/contractor_matching.json` — surfaces contractors pulling permits in more than one
-  connected jurisdiction (a contractor expanding into a new market is a live buying signal there).
-  Release 15.3 builds this compatibility export from canonical `companies.id` records classified
-  as active, verified contractors. Raw permit names never create directory records independently.
-  Name variants consolidate through their canonical company assignment, and every exported row
-  includes verification provenance.
+- **Secured contractor directory:** `contractors.html` / `contractors.js`, reading the authenticated
+  `/api/contractors` endpoint. Release 15.4 exposes active, verified canonical contractors only,
+  with contact readiness, material opportunity, jurisdiction history, and classification provenance.
+  Raw permit names and the legacy static JSON export are not frontend data sources.
 - **Read-only contractor audit:** `python -m pipeline.contractors.audit` prints the current
   contractor/assignment integrity snapshot without migrating or writing to the database. Use
   `--output before.json --markdown before.md` before an approved rebuild, then rerun with
   `--before before.json` afterward. A timestamped database backup and review of the before snapshot
   are mandatory before manually rebuilding the production compatibility table.
+- **One-command production preflight:** `python scripts/prepare_contractor_rebuild.py` creates a
+  timestamped SQLite backup, verifies its integrity and SHA-256, audits that immutable copy, and
+  writes review artifacts under `outputs/contractor-rebuild-audits/`. The command intentionally
+  cannot execute the rebuild.
 - **Jurisdiction connection status (source of truth):** `pipeline/config/jurisdictions.yaml`
 - **Scoring/materials-estimation methodology:** `pipeline/analysis/constants.py` (all weights,
   fractions, and margins are documented heuristic assumptions — see the module docstrings)
