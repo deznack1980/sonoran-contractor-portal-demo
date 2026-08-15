@@ -1,5 +1,6 @@
 """Paths and shared constants for the CorridorIQ pipeline."""
 
+import os
 from pathlib import Path
 
 PIPELINE_DIR = Path(__file__).resolve().parent.parent
@@ -13,6 +14,8 @@ DATA_EXPORTS_DIR = PROJECT_ROOT / "data" / "exports"
 REPORTS_GENERATED_DIR = PROJECT_ROOT / "reports" / "generated"
 # Timestamped logs for the automated morning refresh (Sprint 6.3).
 MORNING_REFRESH_LOG_DIR = PROJECT_ROOT / "logs" / "morning_refresh"
+EXTERNAL_INTELLIGENCE_REFRESH_ENABLED = os.getenv(
+    "CORRIDORIQ_EXTERNAL_REFRESH", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 # Analysis engine version tag, stored on every `projects` row so a future
 # swap to real LLM classification is auditable (which rows used which logic).

@@ -51,6 +51,12 @@
   function card(c) {
     const overdue = c.followup_overdue ? `<span class="badge red">Overdue</span>` : "";
     const repRow = isManager ? `<div><span>Assigned to</span>${CIQ.esc(c.assigned_to || "Unassigned")}</div>` : "";
+    const sourceSignals = [
+      c.is_roc_verified ? '<span class="badge green source-signal">ROC verified</span>' : "",
+      c.is_adot_planholder ? '<span class="badge blue source-signal">ADOT planholder</span>' : "",
+      Number(c.external_evidence_count || 0) > 0
+        ? `<span class="badge slate source-signal">${Number(c.external_evidence_count)} source record${Number(c.external_evidence_count) === 1 ? "" : "s"}</span>` : "",
+    ].filter(Boolean).join("");
     return `<div class="company-card">
       <div class="cc-top">
         <div>
@@ -63,6 +69,7 @@
           <span class="badge ${c.has_contact_info ? "green" : "amber"}">${c.has_contact_info ? "Contact ready" : "Needs contact"}</span>
         </div>
       </div>
+      ${sourceSignals ? `<div class="source-signal-row" aria-label="Verified external data">${sourceSignals}</div>` : ""}
       <div class="cc-reason">${CIQ.esc(c.reason)}</div>
       <div class="muted" style="font-size:12px;margin-top:4px">Source: ${CIQ.esc(c.lead_source || "permit evidence")}</div>
       <div class="cc-meta">

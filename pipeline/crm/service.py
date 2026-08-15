@@ -12,6 +12,7 @@ from pipeline.auth.rbac import AuthzError, can_access_company, has_permission, r
 from pipeline.auth.service import write_audit
 from pipeline.company_resolution import queries as ci_queries
 from pipeline.crm import serializers
+from pipeline import external_intelligence
 
 RELATIONSHIP_STATUSES = {
     "new", "assigned", "researching", "attempted_contact", "contacted",
@@ -92,6 +93,8 @@ def get_company_detail(conn: sqlite3.Connection, user: dict, company_id: int,
         "contacts": base["contacts"],
         "data_quality": base["data_quality"],
         "relationship": serializers.serialize_relationship(rel) if rel else None,
+        "external_evidence": external_intelligence.evidence_for_company(conn, company_id),
+        "source_coverage": external_intelligence.coverage_for_company(conn, company_id),
     }
 
 
@@ -675,6 +678,21 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
                COALESCE(r.lead_classification_source,c.lead_source) AS lead_source,
                COALESCE(r.why_this_lead,c.why_this_lead) AS why_this_lead,
                CASE WHEN {_CONTACT_INFO_SQL} THEN 1 ELSE 0 END AS has_contact_info,
+               (SELECT COUNT(*) FROM company_external_evidence ce WHERE ce.company_id=c.id) AS external_evidence_count,
+               CASE WHEN EXISTS (SELECT 1 FROM company_external_evidence ce WHERE ce.company_id=c.id
+                                 AND ce.source_type='az_roc' AND ce.evidence_type='contractor_license'
+                                 AND lower(COALESCE(ce.status,'')) IN ('active','current','good standing'))
+                    THEN 1 ELSE 0 END AS is_roc_verified,
+               CASE WHEN EXISTS (SELECT 1 FROM company_external_evidence ce WHERE ce.company_id=c.id
+                                 AND ce.source_type='adot' AND ce.evidence_type='plan_holder')
+                    THEN 1 ELSE 0 END AS is_adot_planholder,
+               CASE
+                 WHEN EXISTS (SELECT 1 FROM company_external_evidence ce WHERE ce.company_id=c.id
+                              AND ce.source_type='az_roc' AND ce.evidence_type='contractor_license'
+                              AND lower(COALESCE(ce.status,'')) IN ('active','current','good standing')) THEN 2
+                 WHEN EXISTS (SELECT 1 FROM company_external_evidence ce WHERE ce.company_id=c.id
+                              AND ce.source_type='adot' AND ce.evidence_type='plan_holder') THEN 1
+                 ELSE 0 END AS external_signal_score,
                (SELECT role_type FROM company_roles cr WHERE cr.company_id=c.id
                 ORDER BY is_primary DESC LIMIT 1) AS primary_role
         FROM crm_company_relationships r
@@ -683,6 +701,7 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
         LEFT JOIN users u ON u.id = r.assigned_user_id
         WHERE {where_sql}
         ORDER BY has_contact_info DESC,
+                 external_signal_score DESC,
                  COALESCE(ci.projects_last_30_days,0) DESC,
                  COALESCE(ci.active_projects,0) DESC,
                  COALESCE(ci.highest_opportunity_score,0) DESC,

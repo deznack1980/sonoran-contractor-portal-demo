@@ -206,6 +206,9 @@ def test_admin_dashboard_is_organization_scoped_not_assignment(env):
     assert verification["corridoriq_project_records"] >= 1
     assert verification["crm_relationship_records"] == 2
     assert verification["jurisdiction_sources"] == 1
+    assert verification["external_evidence_records"] == 0
+    assert verification["external_evidence_companies"] == 0
+    assert verification["external_evidence_sources"] == 0
     # Must never look like a personal assignment dashboard.
     assert "my_companies" not in k
     assert "No companies assigned to you" not in json.dumps(dash)
@@ -426,10 +429,14 @@ def test_company_executive_brief_is_evidence_based_printable_and_allowlisted():
     assert "Print / Save PDF" in html
     assert "Copy briefing" in html
     assert "company-executive-brief.html?id=${companyId}" in profile
-    for section in ("Executive summary", "Who to contact", "Project opportunity pipeline",
+    for section in ("Executive summary", "Who to contact", "External intelligence and source coverage", "Project opportunity pipeline",
                     "Permit evidence", "Relationship position", "Risks and data gaps",
                     "Next best actions", "Evidence standard"):
         assert section in script
+    for source in ("az_roc", "azcc", "az_ucc", "adot", "Not researched", "Open source"):
+        assert source in script
+    assert "UCC filing documents a financing record" in script
+    assert "externalIntelligenceSection" in profile
     assert "Missing information is shown as unavailable and is not inferred" in script
     assert "window.print()" in script
     assert "@media print" in css
@@ -445,17 +452,48 @@ def test_admin_dashboard_exposes_live_build_and_data_provenance():
 
     assert 'id="verificationPanel"' in html
     assert "LIVE TEST PROOF" in script
-    assert "Release 14 Executive Briefs: ACTIVE" in script
+    assert "Release 15.1 Live Source Intelligence: ACTIVE" in script
     for field in ("build_id", "database_status", "public_permit_records",
                   "corridoriq_project_records", "imported_contact_records",
+                  "external_evidence_records", "external_evidence_companies",
+                  "external_evidence_sources", "live_public_bids",
+                  "public_bid_planholders", "matched_public_planholders",
                   "crm_activity_records", "crm_relationship_records",
                   "jurisdiction_sources"):
         assert field in script
-    for source in ("Municipal source", "Research import", "Entered in CRM",
+    for source in ("Municipal source", "Research import", "Official / researched", "Entered in CRM",
                    "CorridorIQ derived"):
         assert source in script
     assert ".verification-panel" in css
     assert 'dashboard["data_verification"]["executive_briefs"] = "active"' in server
+    assert 'dashboard["data_verification"]["external_intelligence"] = "active"' in server
+
+
+def test_external_intelligence_import_is_secure_allowlisted_and_source_backed():
+    html = (PROJECT_ROOT / "intelligence-import.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "intelligence-import.js").read_text(encoding="utf-8")
+    common = (PROJECT_ROOT / "portal-common.js").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+    service = (PROJECT_ROOT / "pipeline" / "external_intelligence.py").read_text(encoding="utf-8")
+    schema = (PROJECT_ROOT / "pipeline" / "db" / "schema.sql").read_text(encoding="utf-8")
+
+    assert "Download CSV template" in html and "Download research queue" in html
+    assert "UCC records are financing filings" in html
+    for source in ("Arizona ROC", "Corporation Commission", "Arizona UCC", "ADOT advertisements"):
+        assert source in html
+    for route in ("/api/admin/external-intelligence/coverage", "/api/admin/external-intelligence/research-queue", "/api/admin/external-intelligence/preview", "/api/admin/external-intelligence/import", "/api/admin/external-intelligence/refresh", "/api/admin/external-intelligence/roc-preview", "/api/admin/external-intelligence/roc-import"):
+        assert route in script and route in server
+    assert 'CIQ.guard("admin.system"' in script
+    assert '"intelligence-import.html", "intelligence-import.js"' in server
+    assert "Intelligence Import" in common
+    assert "backup_database(conn)" in service
+    assert "a valid http(s) source_url is required" in service
+    assert "CREATE TABLE IF NOT EXISTS company_external_evidence" in schema
+    assert "CREATE TABLE IF NOT EXISTS external_intelligence_imports" in schema
+    assert "CREATE TABLE IF NOT EXISTS public_bid_opportunities" in schema
+    assert "CREATE TABLE IF NOT EXISTS public_bid_planholders" in schema
+    assert "Refresh live ADOT data" in html
+    assert "Official ROC active-license CSV" in html
 
 
 def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
@@ -469,8 +507,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-company-brief-r14" in launcher
-    assert 'BUILD_ID = "2026-08-15-company-brief-r14"' in server
+    assert "2026-08-15-live-source-intelligence-r15.1" in launcher
+    assert 'BUILD_ID = "2026-08-15-live-source-intelligence-r15.1"' in server
 
 
 # --------------------------------------------------------------------------
@@ -601,6 +639,13 @@ def http_server(tmp_path, monkeypatch):
         "VALUES ('UI Ready Supply','ui-ready',1,'Taylor Quotes','quotes@ui-ready.example',?,?)",
         (now, now),
     ).lastrowid
+    c.execute(
+        "INSERT INTO company_external_evidence (company_id,source_type,source_agency,evidence_type,"
+        "source_record_id,title,status,summary,source_url,retrieved_at,confidence,match_method,created_at,updated_at) "
+        "VALUES (?,'az_roc','Arizona Registrar of Contractors','contractor_license','ROC-UI-123',"
+        "'Arizona contractor license','Active','Classification CR-37','https://roc.az.gov/contractor-search',"
+        "?,95,'license_number',?,?)", (company_id, now, now, now),
+    )
     c.commit()
     c.close()
 
@@ -939,8 +984,9 @@ def test_company_executive_brief_browser_flow(http_server):
         proof = page.locator("#verificationPanel")
         proof.wait_for(state="visible")
         assert "LIVE TEST PROOF" in proof.inner_text()
-        assert "Release 14 Executive Briefs: ACTIVE" in proof.inner_text()
-        assert "2026-08-15-company-brief-r14" in proof.inner_text()
+        assert "Release 15.1 Live Source Intelligence: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-live-source-intelligence-r15.1" in proof.inner_text()
+        assert "External evidence" in proof.inner_text()
         assert "Municipal source" in proof.inner_text()
         assert "Entered in CRM" in proof.inner_text()
         page.goto(base + f"/sales-company-profile.html?id={http_server['company_id']}", wait_until="networkidle")
@@ -951,6 +997,9 @@ def test_company_executive_brief_browser_flow(http_server):
         assert "UI Quote Plumbing" in brief.inner_text()
         assert "Executive summary" in brief.inner_text()
         assert "Who to contact" in brief.inner_text()
+        assert "External intelligence and source coverage" in brief.inner_text()
+        assert "Arizona contractor license" in brief.inner_text()
+        assert "Not researched" in brief.inner_text()
         assert "Project opportunity pipeline" in brief.inner_text()
         assert "Permit evidence" in brief.inner_text()
         assert "Risks and data gaps" in brief.inner_text()

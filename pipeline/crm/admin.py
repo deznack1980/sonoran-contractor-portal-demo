@@ -246,6 +246,23 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
         "SELECT COUNT(DISTINCT ct.id) AS n FROM contacts ct "
         "JOIN crm_company_relationships r ON r.company_id=ct.company_id "
         "WHERE r.organization_id=?", (org_id,))
+    external_evidence_records = _n(
+        "SELECT COUNT(DISTINCT e.id) AS n FROM company_external_evidence e "
+        "JOIN crm_company_relationships r ON r.company_id=e.company_id "
+        "WHERE r.organization_id=?", (org_id,))
+    external_evidence_companies = _n(
+        "SELECT COUNT(DISTINCT e.company_id) AS n FROM company_external_evidence e "
+        "JOIN crm_company_relationships r ON r.company_id=e.company_id "
+        "WHERE r.organization_id=?", (org_id,))
+    external_evidence_sources = _n(
+        "SELECT COUNT(DISTINCT e.source_type) AS n FROM company_external_evidence e "
+        "JOIN crm_company_relationships r ON r.company_id=e.company_id "
+        "WHERE r.organization_id=?", (org_id,))
+    live_public_bids = _n(
+        "SELECT COUNT(*) AS n FROM public_bid_opportunities WHERE source_type='adot' AND is_active=1")
+    public_bid_planholders = _n("SELECT COUNT(*) AS n FROM public_bid_planholders")
+    matched_public_planholders = _n(
+        "SELECT COUNT(*) AS n FROM public_bid_planholders WHERE company_id IS NOT NULL")
     jurisdiction_sources = _n("SELECT COUNT(*) AS n FROM jurisdictions")
 
     refresh = pipeline_runs.admin_status(conn)
@@ -337,6 +354,12 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
             "crm_activity_records": crm_activity_records,
             "crm_task_records": crm_task_records,
             "imported_contact_records": contact_records,
+            "external_evidence_records": external_evidence_records,
+            "external_evidence_companies": external_evidence_companies,
+            "external_evidence_sources": external_evidence_sources,
+            "live_public_bids": live_public_bids,
+            "public_bid_planholders": public_bid_planholders,
+            "matched_public_planholders": matched_public_planholders,
             "jurisdiction_sources": jurisdiction_sources,
             "latest_source_refresh": simple.get("last_completed"),
         },
