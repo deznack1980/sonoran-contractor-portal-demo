@@ -50,6 +50,7 @@
         </div>
       </div>
       <div class="action-bar">
+        <a class="btn btn-primary btn-sm" href="company-executive-brief.html?id=${companyId}">Executive brief</a>
         ${c.main_phone ? `<a class="btn btn-primary btn-sm" href="tel:${CIQ.esc(c.main_phone)}" data-a="call">Call</a>`
           : `<button class="btn btn-primary btn-sm" data-a="call">Call</button>`}
         ${c.main_email ? `<a class="btn btn-sm" href="mailto:${CIQ.esc(c.main_email)}" data-a="email">Email</a>`

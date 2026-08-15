@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CorridorIQ evidence-based company executive outreach brief." />
+  <title>CorridorIQ — Company Executive Outreach Brief</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="executive-brief-toolbar no-print">
+      <a id="backToCompany" class="btn btn-sm" href="my-companies.html">← Company profile</a>
+      <div class="row">
+        <button id="copyBriefBtn" class="btn btn-sm" type="button">Copy briefing</button>
+        <button id="printBriefBtn" class="btn btn-sm btn-primary" type="button">Print / Save PDF</button>
+      </div>
+    </div>
+    <div id="briefStatus"><div class="skel skel-row" style="height:180px"></div></div>
+    <article id="executiveBrief" class="executive-brief" hidden></article>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="company-executive-brief.js"></script>
+</body>
+</html>

@@ -200,6 +200,12 @@ def test_admin_dashboard_is_organization_scoped_not_assignment(env):
     assert k["contact_ready_contractors"] == 1
     assert k["contractors_needing_enrichment"] == 0
     assert k["active_employees"] >= 4
+    verification = dash["data_verification"]
+    assert verification["database_status"] == "connected"
+    assert verification["public_permit_records"] >= 1
+    assert verification["corridoriq_project_records"] >= 1
+    assert verification["crm_relationship_records"] == 2
+    assert verification["jurisdiction_sources"] == 1
     # Must never look like a personal assignment dashboard.
     assert "my_companies" not in k
     assert "No companies assigned to you" not in json.dumps(dash)
@@ -409,6 +415,49 @@ def test_opportunity_board_uses_real_status_assignment_and_material_signals():
     assert "@media(max-width:900px){.board-filters{grid-template-columns:1fr}" in css
 
 
+def test_company_executive_brief_is_evidence_based_printable_and_allowlisted():
+    html = (PROJECT_ROOT / "company-executive-brief.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "company-executive-brief.js").read_text(encoding="utf-8")
+    profile = (PROJECT_ROOT / "sales-company-profile.js").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "portal.css").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+
+    assert "Company Executive Outreach Brief" in html
+    assert "Print / Save PDF" in html
+    assert "Copy briefing" in html
+    assert "company-executive-brief.html?id=${companyId}" in profile
+    for section in ("Executive summary", "Who to contact", "Project opportunity pipeline",
+                    "Permit evidence", "Relationship position", "Risks and data gaps",
+                    "Next best actions", "Evidence standard"):
+        assert section in script
+    assert "Missing information is shown as unavailable and is not inferred" in script
+    assert "window.print()" in script
+    assert "@media print" in css
+    assert '"company-executive-brief.html"' in server
+    assert '"company-executive-brief.js"' in server
+
+
+def test_admin_dashboard_exposes_live_build_and_data_provenance():
+    html = (PROJECT_ROOT / "admin-dashboard.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "admin-dashboard.js").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "portal.css").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+
+    assert 'id="verificationPanel"' in html
+    assert "LIVE TEST PROOF" in script
+    assert "Release 14 Executive Briefs: ACTIVE" in script
+    for field in ("build_id", "database_status", "public_permit_records",
+                  "corridoriq_project_records", "imported_contact_records",
+                  "crm_activity_records", "crm_relationship_records",
+                  "jurisdiction_sources"):
+        assert field in script
+    for source in ("Municipal source", "Research import", "Entered in CRM",
+                   "CorridorIQ derived"):
+        assert source in script
+    assert ".verification-panel" in css
+    assert 'dashboard["data_verification"]["executive_briefs"] = "active"' in server
+
+
 def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     rollout = (PROJECT_ROOT / "scripts" / "apply_lead_integrity.py").read_text(encoding="utf-8")
     one_click = (PROJECT_ROOT / "ApplyCorridorIQLeadIntegrity.bat").read_text(encoding="utf-8")
@@ -420,8 +469,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-crm-stabilization-r13" in launcher
-    assert 'BUILD_ID = "2026-08-15-crm-stabilization-r13"' in server
+    assert "2026-08-15-company-brief-r14" in launcher
+    assert 'BUILD_ID = "2026-08-15-company-brief-r14"' in server
 
 
 # --------------------------------------------------------------------------
@@ -863,6 +912,50 @@ def test_opportunity_board_browser_flow_uses_real_crm_state(http_server):
         card.locator("select[data-status-company]").select_option("qualified")
         page.wait_for_selector('[data-stage="qualified"] .op-card', timeout=8000)
         assert "Qualified" in page.locator('[data-stage="qualified"] .op-card').inner_text()
+        assert errors == []
+        browser.close()
+
+
+def test_company_executive_brief_browser_flow(http_server):
+    """A company profile opens a complete evidence-based report without
+    requiring an export or exposing non-allowlisted assets."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    base = f"http://127.0.0.1:{http_server['port']}"
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            pytest.skip("Chromium not installed for Playwright")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(base + "/login.html")
+        page.fill("#email", "uiadmin@corridoriq.com")
+        page.fill("#password", "UiAdmin123")
+        page.click("#loginBtn")
+        page.wait_for_url("**/admin-dashboard.html")
+        proof = page.locator("#verificationPanel")
+        proof.wait_for(state="visible")
+        assert "LIVE TEST PROOF" in proof.inner_text()
+        assert "Release 14 Executive Briefs: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-company-brief-r14" in proof.inner_text()
+        assert "Municipal source" in proof.inner_text()
+        assert "Entered in CRM" in proof.inner_text()
+        page.goto(base + f"/sales-company-profile.html?id={http_server['company_id']}", wait_until="networkidle")
+        page.get_by_role("link", name="Executive brief").click()
+        page.wait_for_url("**/company-executive-brief.html?id=*")
+        brief = page.locator("#executiveBrief")
+        brief.wait_for(state="visible")
+        assert "UI Quote Plumbing" in brief.inner_text()
+        assert "Executive summary" in brief.inner_text()
+        assert "Who to contact" in brief.inner_text()
+        assert "Project opportunity pipeline" in brief.inner_text()
+        assert "Permit evidence" in brief.inner_text()
+        assert "Risks and data gaps" in brief.inner_text()
+        assert "Evidence standard" in brief.inner_text()
+        assert page.get_by_role("button", name="Print / Save PDF").is_visible()
         assert errors == []
         browser.close()
 

@@ -236,6 +236,17 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
         "SELECT COUNT(*) AS n FROM crm_tasks WHERE organization_id=? "
         "AND status IN ('open','in_progress') AND due_at IS NOT NULL "
         "AND substr(due_at,1,10) < ?", (org_id, today))
+    crm_relationship_records = _n(
+        "SELECT COUNT(*) AS n FROM crm_company_relationships WHERE organization_id=?", (org_id,))
+    crm_activity_records = _n(
+        "SELECT COUNT(*) AS n FROM crm_activities WHERE organization_id=?", (org_id,))
+    crm_task_records = _n(
+        "SELECT COUNT(*) AS n FROM crm_tasks WHERE organization_id=?", (org_id,))
+    contact_records = _n(
+        "SELECT COUNT(DISTINCT ct.id) AS n FROM contacts ct "
+        "JOIN crm_company_relationships r ON r.company_id=ct.company_id "
+        "WHERE r.organization_id=?", (org_id,))
+    jurisdiction_sources = _n("SELECT COUNT(*) AS n FROM jurisdictions")
 
     refresh = pipeline_runs.admin_status(conn)
     simple = pipeline_runs.employee_status(conn)
@@ -316,6 +327,18 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
             "last_completed": simple.get("last_completed"),
             "running": refresh.get("running"),
             "summary": summary,
+        },
+        "data_verification": {
+            "database_status": "connected",
+            "generated_at": _now(),
+            "public_permit_records": total_permits,
+            "corridoriq_project_records": total_projects,
+            "crm_relationship_records": crm_relationship_records,
+            "crm_activity_records": crm_activity_records,
+            "crm_task_records": crm_task_records,
+            "imported_contact_records": contact_records,
+            "jurisdiction_sources": jurisdiction_sources,
+            "latest_source_refresh": simple.get("last_completed"),
         },
         "jurisdiction_freshness": freshness or [],
         "recent_pipeline_activity": recent_pipeline,

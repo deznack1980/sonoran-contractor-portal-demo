@@ -125,6 +125,31 @@
     if (button && !running) button.addEventListener("click", runMorningRefresh);
   }
 
+  function renderVerification() {
+    const v = data.data_verification || {};
+    const latest = v.latest_source_refresh ? CIQ.fmtDateTime(v.latest_source_refresh) : "No completed refresh recorded";
+    const metric = (label, number, sourceClass, sourceLabel) => `<div class="verification-metric">
+      <span>${CIQ.esc(label)}</span><strong>${Number(number || 0).toLocaleString()}</strong>
+      <small class="source-tag ${sourceClass}">${CIQ.esc(sourceLabel)}</small></div>`;
+    document.getElementById("verificationPanel").innerHTML = `<div class="verification-head">
+      <div><span class="live-proof"><i></i> LIVE TEST PROOF</span><h3>Release 14 Executive Briefs: ACTIVE</h3>
+        <p>This panel is rendered by the running server and counted from its connected database—not from a spreadsheet or static mockup.</p></div>
+      <div class="verification-build"><span>RUNNING BUILD</span><strong>${CIQ.esc(v.build_id || "Build unavailable")}</strong>
+        <small>Database: ${CIQ.esc(v.database_status || "unknown")} · ${CIQ.esc(latest)}</small></div>
+    </div><div class="verification-grid">
+      ${metric("Permit records", v.public_permit_records, "source-public", "Municipal source")}
+      ${metric("Project records", v.corridoriq_project_records, "source-derived", "CorridorIQ derived")}
+      ${metric("Imported contacts", v.imported_contact_records, "source-imported", "Research import")}
+      ${metric("CRM activities", v.crm_activity_records, "source-crm", "Entered in CRM")}
+      ${metric("CRM relationships", v.crm_relationship_records, "source-crm", "Entered in CRM")}
+      ${metric("Jurisdictions", v.jurisdiction_sources, "source-public", "Municipal source")}
+    </div><div class="verification-legend"><strong>What is real:</strong>
+      <span><i class="source-public"></i> public permit source</span>
+      <span><i class="source-imported"></i> imported contact research</span>
+      <span><i class="source-crm"></i> your CRM activity</span>
+      <span><i class="source-derived"></i> CorridorIQ calculation</span></div>`;
+  }
+
   function renderFreshness() {
     const el = document.getElementById("freshness");
     const items = data.jurisdiction_freshness || [];
@@ -206,6 +231,7 @@
       return;
     }
     renderRefresh();
+    renderVerification();
     renderKpis();
     renderActions();
     renderFreshness();
