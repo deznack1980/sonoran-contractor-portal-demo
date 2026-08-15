@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 set "PORT=8780"
-set "BUILD=2026-08-15-crm-stabilization-r13"
+set "BUILD=2026-08-15-company-brief-r14"
 set "URL=http://127.0.0.1:%PORT%/login.html?build=%BUILD%"
 
 REM Prefer the Windows py launcher, then python.

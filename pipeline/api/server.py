@@ -40,13 +40,14 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-crm-stabilization-r13"
+BUILD_ID = "2026-08-15-company-brief-r14"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
     "login.html", "sales-dashboard.html", "sales-dashboard.js",
     "my-companies.html", "my-companies.js", "sales-company-profile.html",
-    "sales-company-profile.js", "my-tasks.html", "my-tasks.js",
+    "sales-company-profile.js", "company-executive-brief.html",
+    "company-executive-brief.js", "my-tasks.html", "my-tasks.js",
     "team-dashboard.html", "team-dashboard.js", "user-management.html",
     "user-management.js",
     # Role-aware dashboards.
