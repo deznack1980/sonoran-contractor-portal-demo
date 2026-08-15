@@ -24,9 +24,22 @@ _DATE_EVENTS = (
 )
 
 
-def rebuild_company_timeline(conn: sqlite3.Connection, batch: int = 5000) -> int:
-    """Populate company_activity from linked permits. Idempotent. Returns inserts."""
+def rebuild_company_timeline(
+    conn: sqlite3.Connection,
+    batch: int = 5000,
+    *,
+    replace_permit_events: bool = False,
+) -> int:
+    """Populate company_activity from linked permits.
+
+    replace_permit_events removes and regenerates only permit-derived rows,
+    preserving CRM calls, notes, and tasks. Use it after contractor links are
+    corrected so stale architect/engineer timeline events cannot survive.
+    """
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    if replace_permit_events:
+        conn.execute("DELETE FROM company_activity WHERE source='permits'")
+        conn.commit()
 
     union = " UNION ALL ".join(
         f"SELECT pr.{col} AS company_id, p.id AS permit_id, pr.id AS project_id, "
