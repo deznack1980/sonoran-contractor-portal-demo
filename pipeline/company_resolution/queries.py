@@ -205,7 +205,7 @@ def company_projects(conn: sqlite3.Connection, company_id: int,
         SELECT DISTINCT pr.id AS project_id, p.permit_number, p.jurisdiction, p.city,
                p.job_address, p.status, pr.project_category, pr.project_lifecycle,
                pr.opportunity_score, pr.opportunity_date, pr.opportunity_timing,
-               pr.estimated_material_value
+               pr.estimated_material_value,pr.estimated_plumbing_scope
         FROM projects pr JOIN permits p ON p.id = pr.permit_id
         WHERE {where}
         ORDER BY pr.opportunity_date DESC

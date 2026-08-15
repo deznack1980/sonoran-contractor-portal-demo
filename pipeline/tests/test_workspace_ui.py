@@ -76,16 +76,24 @@ def _intel(c, company_id, tier="High", score=75, **extra):
 def _project(c, company_id, score=90, lifecycle="permitting", days_ago=1):
     now = _now()
     d = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-    cur = c.execute("INSERT INTO permits (jurisdiction, permit_number, job_address, city, "
-                    "state, status, contractor_company_id, issued_date, first_seen_at, last_updated_at) "
-                    "VALUES ('phoenix_az',?,?, 'PHOENIX','AZ','issued',?,?,?,?)",
+    cur = c.execute("INSERT INTO permits (jurisdiction, permit_number, permit_type, description, job_address, city, "
+                    "state, zip, status, contractor_company_id, issued_date, first_seen_at, last_updated_at) "
+                    "VALUES ('phoenix_az',?, 'Commercial plumbing', 'Restroom and backflow plumbing',?, "
+                    "'PHOENIX','AZ','85004','issued',?,?,?,?)",
                     (f"P{company_id}-{days_ago}", "123 Main St", company_id, d, now, now))
     pid = cur.lastrowid
     project = c.execute("INSERT INTO projects (permit_id, jurisdiction, contractor_company_id, "
                         "project_category, project_lifecycle, opportunity_score, opportunity_date, "
-                        "opportunity_timing, estimated_material_value) "
-                        "VALUES (?, 'phoenix_az', ?, 'commercial', ?, ?, ?, 'immediate', 5000)",
-                        (pid, company_id, lifecycle, score, d))
+                        "opportunity_timing, estimated_material_value, estimated_plumbing_scope, "
+                        "confidence_score, analysis_version, analyzed_at) "
+                        "VALUES (?, 'phoenix_az', ?, 'commercial', ?, ?, ?, 'immediate', 5000, "
+                        "'Commercial Fixtures, Backflow, Valves', 86, 'test-estimator', ?)",
+                        (pid, company_id, lifecycle, score, d, now))
+    c.executemany(
+        "INSERT INTO estimated_materials (project_id,material_name,confidence_pct,rationale) VALUES (?,?,?,?)",
+        [(project.lastrowid, "Commercial Fixtures", 90, "Restroom keyword"),
+         (project.lastrowid, "Backflow", 85, "Backflow keyword")],
+    )
     c.commit()
     return project.lastrowid
 
@@ -452,12 +460,13 @@ def test_admin_dashboard_exposes_live_build_and_data_provenance():
 
     assert 'id="verificationPanel"' in html
     assert "LIVE TEST PROOF" in script
-    assert "Release 15.1 Live Source Intelligence: ACTIVE" in script
+    assert "Release 15.2 Project Material Estimates: ACTIVE" in script
     for field in ("build_id", "database_status", "public_permit_records",
                   "corridoriq_project_records", "imported_contact_records",
                   "external_evidence_records", "external_evidence_companies",
                   "external_evidence_sources", "live_public_bids",
                   "public_bid_planholders", "matched_public_planholders",
+                  "project_material_estimates", "estimated_material_categories",
                   "crm_activity_records", "crm_relationship_records",
                   "jurisdiction_sources"):
         assert field in script
@@ -507,8 +516,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-live-source-intelligence-r15.1" in launcher
-    assert 'BUILD_ID = "2026-08-15-live-source-intelligence-r15.1"' in server
+    assert "2026-08-15-project-material-estimates-r15.2" in launcher
+    assert 'BUILD_ID = "2026-08-15-project-material-estimates-r15.2"' in server
 
 
 # --------------------------------------------------------------------------
@@ -699,6 +708,12 @@ def test_http_workspace_endpoints_ok(http_server):
         status, data, _ = _req(port, "GET", path, cookie=cookie)
         assert status == 200, path
         assert isinstance(data, dict)
+    estimate_path = (f"/api/material-lists/project-estimate?company_id={http_server['company_id']}"
+                     f"&project_id={http_server['project_id']}")
+    status, estimate, _ = _req(port, "GET", estimate_path, cookie=cookie)
+    assert status == 200
+    assert estimate["project"]["estimated_plumbing_scope"] == "Commercial Fixtures, Backflow, Valves"
+    assert estimate["suggestions"][0]["quantity_status"] == "needs_confirmation"
 
 
 def test_http_material_list_rfq_lifecycle(http_server):
@@ -821,6 +836,12 @@ def test_material_list_mobile_and_action_clarity_contract():
     assert "Automatic import supports CSV" in html
     assert "PDF, Excel, CSV, photo, or screenshot" not in html
     assert 'id="draftSaveState"' in html
+    assert 'id="projectEstimatePanel"' in html
+    assert "/api/material-lists/project-estimate" in script
+    assert "PROJECT-SPECIFIC PRELIMINARY ESTIMATE" in script
+    assert "Add suggestions to material list" in script
+    assert "Quantity confirmation required" in script
+    assert "estimateConfidencePct" in script and "quantityStatus" in script
     assert all(action in script for action in
                ("Open Email", "Mark Sent", "Record response", "Mark declined", "Award quote"))
     assert "scheduleLocalSave" in script
@@ -984,8 +1005,8 @@ def test_company_executive_brief_browser_flow(http_server):
         proof = page.locator("#verificationPanel")
         proof.wait_for(state="visible")
         assert "LIVE TEST PROOF" in proof.inner_text()
-        assert "Release 15.1 Live Source Intelligence: ACTIVE" in proof.inner_text()
-        assert "2026-08-15-live-source-intelligence-r15.1" in proof.inner_text()
+        assert "Release 15.2 Project Material Estimates: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-project-material-estimates-r15.2" in proof.inner_text()
         assert "External evidence" in proof.inner_text()
         assert "Municipal source" in proof.inner_text()
         assert "Entered in CRM" in proof.inner_text()
@@ -1005,6 +1026,39 @@ def test_company_executive_brief_browser_flow(http_server):
         assert "Risks and data gaps" in brief.inner_text()
         assert "Evidence standard" in brief.inner_text()
         assert page.get_by_role("button", name="Print / Save PDF").is_visible()
+        assert errors == []
+        browser.close()
+
+
+def test_project_material_estimate_prefills_editable_bom_in_browser(http_server):
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    base = f"http://127.0.0.1:{http_server['port']}"
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            pytest.skip("Chromium not installed for Playwright")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(base + "/login.html")
+        page.fill("#email", "uirep@corridoriq.com")
+        page.fill("#password", "UiRep123")
+        page.click("#loginBtn")
+        page.wait_for_url("**/sales-dashboard.html")
+        page.goto(base + f"/material-list-intake.html?company_id={http_server['company_id']}"
+                         f"&project_id={http_server['project_id']}", wait_until="networkidle")
+        panel = page.locator("#projectEstimatePanel")
+        panel.wait_for(state="visible")
+        assert "PROJECT-SPECIFIC PRELIMINARY ESTIMATE" in panel.inner_text()
+        assert "Commercial Fixtures" in panel.inner_text()
+        assert "Quantity confirmation required" in panel.inner_text()
+        assert page.get_by_label("Description").count() == 2
+        assert page.get_by_label("Quantity").first.input_value() == ""
+        page.get_by_role("button", name="Submit for Review").click()
+        assert page.get_by_text("Confirm quantities for all 2 suggested material items.").is_visible()
         assert errors == []
         browser.close()
 

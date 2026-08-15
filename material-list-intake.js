@@ -13,6 +13,7 @@
   let catalogPopup = null, catalogInput = null, catalogRow = null;
   let catalogItems = [], catalogIndex = -1, catalogRequest = 0;
   let dirty = false, autosaveTimer = null;
+  let estimateData = null;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => CIQ.esc(value == null ? "" : value);
@@ -48,7 +49,7 @@
   }
 
   function blankRow(values) {
-    return Object.assign({ id: id(), qty: 1, description: "", unit: "each", manufacturer: "", allowSubstitution: true, productId: null, sku: "", supplierPrice: null, quantityAvailable: null, leadTimeDays: null }, values || {});
+    return Object.assign({ id: id(), qty: 1, description: "", unit: "each", manufacturer: "", allowSubstitution: true, productId: null, sku: "", supplierPrice: null, quantityAvailable: null, leadTimeDays: null, suggestionSource: null, estimateConfidencePct: null, estimateRationale: "", quantityStatus: "confirmed" }, values || {});
   }
 
   function ensureCatalogPopup() {
@@ -134,6 +135,10 @@
         productId: r.productId || null, sku: String(r.sku || ""), supplierPrice: r.supplierPrice,
         quantityAvailable: r.quantityAvailable, leadTimeDays: r.leadTimeDays,
         allowSubstitution: r.allowSubstitution !== false,
+        suggestionSource: r.suggestionSource || null,
+        estimateConfidencePct: r.estimateConfidencePct,
+        estimateRationale: r.estimateRationale || "",
+        quantityStatus: r.quantityStatus || (Number(r.qty) > 0 ? "confirmed" : "needs_confirmation"),
       })),
       updatedAt: new Date().toISOString(),
     };
@@ -161,8 +166,9 @@
   function render() {
     closeCatalogPopup();
     $("bomBody").innerHTML = rows.map((r) => `<tr data-id="${esc(r.id)}">
-      <td data-label="Quantity"><input aria-label="Quantity" data-field="qty" type="number" min="0" step="1" value="${esc(r.qty)}"></td>
-      <td data-label="Item"><div class="catalog-entry"><input aria-label="Description" data-field="description" value="${esc(r.description)}" placeholder="Type product, SKU, part number…" autocomplete="off" aria-haspopup="listbox" aria-expanded="false"></div></td>
+      <td data-label="Quantity"><input aria-label="Quantity" data-field="qty" type="number" min="0" step="1" value="${esc(r.qty)}" placeholder="Confirm"></td>
+      <td data-label="Item"><div class="catalog-entry"><input aria-label="Description" data-field="description" value="${esc(r.description)}" placeholder="Type product, SKU, part number…" autocomplete="off" aria-haspopup="listbox" aria-expanded="false"></div>
+        ${r.suggestionSource === "project_estimate" ? `<div class="estimate-line-meta"><span class="badge blue">Suggested · ${Math.round(Number(r.estimateConfidencePct || 0))}%</span><small>${esc(r.estimateRationale || "Permit-based project estimate")}</small></div>` : ""}</td>
       <td data-label="Unit"><input aria-label="Unit" data-field="unit" value="${esc(r.unit)}" placeholder="each"></td>
       <td data-label="Manufacturer"><input aria-label="Manufacturer" data-field="manufacturer" value="${esc(r.manufacturer)}" placeholder="Optional"></td>
       <td data-label="Alternates"><select aria-label="Alternates" data-field="allowSubstitution"><option value="true" ${r.allowSubstitution !== false ? "selected" : ""}>Allowed</option><option value="false" ${r.allowSubstitution === false ? "selected" : ""}>Exact only</option></select></td>
@@ -177,6 +183,10 @@
       input.addEventListener("input", () => {
         const row = rows.find((r) => r.id === input.closest("tr").dataset.id);
         row[input.dataset.field] = input.dataset.field === "qty" ? input.valueAsNumber : input.value;
+        if (input.dataset.field === "qty") {
+          row.quantityStatus = Number(input.value) > 0 ? "confirmed" :
+            (row.suggestionSource === "project_estimate" ? "needs_confirmation" : "confirmed");
+        }
         if (input.dataset.field === "description") {
           row.productId = null; row.sku = ""; row.supplierPrice = null;
           scheduleCatalogSearch(input, row);
@@ -296,8 +306,11 @@
   function validate() {
     const draft = readForm();
     const validRows = draft.rows.filter((r) => r.qty > 0 && r.description);
+    const unconfirmed = draft.rows.filter((r) => r.description &&
+      (!(r.qty > 0) || r.quantityStatus === "needs_confirmation"));
     if (!draft.companyName) return "Enter the contractor or company.";
     if (!draft.projectName) return "Enter a project name or job address.";
+    if (unconfirmed.length) return `Confirm quantities for all ${unconfirmed.length} suggested material item${unconfirmed.length === 1 ? "" : "s"}.`;
     if (!validRows.length) return "Add at least one item with a quantity and description.";
     return "";
   }
@@ -600,6 +613,10 @@
           manufacturer: row.manufacturer, productId: row.product_id, sku: row.sku,
           supplierPrice: row.supplier_price, quantityAvailable: row.quantity_available,
           leadTimeDays: row.lead_time_days, allowSubstitution: Boolean(row.allow_substitution),
+          suggestionSource: row.suggestion_source,
+          estimateConfidencePct: row.estimate_confidence_pct,
+          estimateRationale: row.estimate_rationale,
+          quantityStatus: row.quantity_status,
         })),
       });
       return true;
@@ -608,17 +625,69 @@
     }
   }
 
-  async function prefillContext() {
+  function estimatedRows() {
+    return (estimateData && estimateData.suggestions || []).map((item) => blankRow({
+      qty: "", description: item.description, unit: "confirm", manufacturer: "",
+      suggestionSource: item.suggestion_source || "project_estimate",
+      estimateConfidencePct: item.confidence_pct,
+      estimateRationale: item.rationale || "Permit-based project estimate",
+      quantityStatus: "needs_confirmation",
+    }));
+  }
+
+  function addEstimatedRows() {
+    const suggestions = estimatedRows();
+    if (!suggestions.length) return;
+    const existing = new Set(rows.filter((row) => row.description).map((row) =>
+      String(row.description).trim().toLowerCase()));
+    const additions = suggestions.filter((row) => !existing.has(row.description.trim().toLowerCase()));
+    const onlyBlank = rows.length === 1 && !String(rows[0].description || "").trim();
+    if (onlyBlank) rows = [];
+    rows.push(...additions);
+    if (!rows.length) rows = [blankRow()];
+    sourceName = "CorridorIQ project estimate";
+    $("fileName").textContent = sourceName;
+    $("fileName").style.display = "inline-block";
+    render(); scheduleLocalSave();
+    CIQ.toast(`${additions.length} estimated material suggestion${additions.length === 1 ? "" : "s"} added. Confirm quantities before pricing.`, "success");
+  }
+
+  function renderProjectEstimate() {
+    const panel = $("projectEstimatePanel");
+    if (!panel || !estimateData) return;
+    const project = estimateData.project || {}, suggestions = estimateData.suggestions || [];
+    const scope = project.estimated_plumbing_scope || suggestions.map((item) => item.description).slice(0, 4).join(", ") || "No material scope generated";
+    panel.hidden = false;
+    panel.innerHTML = `<div class="project-estimate-head"><div><span class="eyebrow">PROJECT-SPECIFIC PRELIMINARY ESTIMATE</span>
+      <h2>${esc(project.job_address || project.permit_number || "Selected project")}</h2>
+      <p>Derived from the permit category and published scope—not a final contractor takeoff.</p></div>
+      <button class="btn btn-primary" type="button" data-load-estimate ${suggestions.length ? "" : "disabled"}>Add suggestions to material list</button></div>
+      <div class="project-estimate-metrics">
+        <div><span>Likely scope</span><strong>${esc(scope)}</strong></div>
+        <div><span>Estimated material opportunity</span><strong>${project.estimated_material_value == null ? "Unavailable" : CIQ.money(project.estimated_material_value)}</strong></div>
+        <div><span>Project category</span><strong>${esc(CIQ.titleCase(project.project_category || "Unknown"))}</strong></div>
+        <div><span>Suggested categories</span><strong>${suggestions.length}</strong></div>
+      </div>
+      <div class="estimate-suggestion-strip">${suggestions.map((item) => `<span><b>${esc(item.description)}</b><small>${Math.round(Number(item.confidence_pct || 0))}% confidence</small></span>`).join("") || "<span>No material categories were generated for this permit.</span>"}</div>
+      <div class="estimate-quantity-warning"><strong>Quantity confirmation required:</strong> ${esc(estimateData.quantity_policy || "Confirm all quantities before pricing.")}</div>`;
+    const button = panel.querySelector("[data-load-estimate]");
+    if (button) button.addEventListener("click", addEstimatedRows);
+  }
+
+  async function prefillContext(seedEstimateRows) {
     const companyId = Number(CIQ.qs("company_id"));
     const projectId = String(CIQ.qs("project_id") || "");
     if (!companyId) return;
     try {
       const detail = await CIQ.api.get("/api/sales/companies/" + companyId);
       if (!$("companyName").value) $("companyName").value = detail.company.display_name || detail.company.legal_name || "";
-      if (projectId && !$("projectName").value) {
-        const data = await CIQ.api.get("/api/sales/companies/" + companyId + "/projects");
-        const project = (data.items || data || []).find((p) => String(p.project_id) === projectId);
-        if (project) $("projectName").value = project.job_address || project.permit_number || "";
+      if (projectId) {
+        estimateData = await CIQ.api.get("/api/material-lists/project-estimate?" + new URLSearchParams({ company_id: companyId, project_id: projectId }));
+        const project = estimateData.project || {};
+        if (!$("projectName").value) $("projectName").value = project.job_address || project.permit_number || "";
+        if (!$("jobsitePostalCode").value) $("jobsitePostalCode").value = project.postal_code || "";
+        renderProjectEstimate();
+        if (seedEstimateRows && (estimateData.suggestions || []).length) addEstimatedRows();
       }
     } catch (error) {
       CIQ.toast("Could not prefill project details", "info");
@@ -666,7 +735,7 @@
     const cartDraft = draft ? null : draftFromCart();
     writeForm(draft || cartDraft || { rows: [blankRow()] });
     const loadedServerDraft = await loadServerDraft(draft);
-    if (!loadedServerDraft) await prefillContext();
+    await prefillContext(!loadedServerDraft && !draft && !cartDraft);
     if (!$("quoteNeededBy").value) $("quoteNeededBy").value = dateFromToday(2);
     persistLocalDraft();
     await loadRfqWorkspace();

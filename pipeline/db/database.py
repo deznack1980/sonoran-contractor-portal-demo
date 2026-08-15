@@ -122,6 +122,10 @@ _KNOWLEDGE_V21_COLUMNS = [
     ("material_lists", "jobsite_postal_code", "TEXT"),
     ("material_lists", "project_name_snapshot", "TEXT"),
     ("material_list_items", "allow_substitution", "INTEGER NOT NULL DEFAULT 1"),
+    ("material_list_items", "suggestion_source", "TEXT"),
+    ("material_list_items", "estimate_confidence_pct", "REAL"),
+    ("material_list_items", "estimate_rationale", "TEXT"),
+    ("material_list_items", "quantity_status", "TEXT NOT NULL DEFAULT 'confirmed'"),
 ]
 
 
@@ -208,4 +212,3 @@ if __name__ == "__main__":
     print(f"Database initialized at {DB_PATH}")
     print(f"Seeded {count} jurisdictions.")
     connection.close()
-

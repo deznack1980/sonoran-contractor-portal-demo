@@ -42,7 +42,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-live-source-intelligence-r15.1"
+BUILD_ID = "2026-08-15-project-material-estimates-r15.2"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -339,6 +339,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         # --- material lists ---
         if path == "/api/material-lists/latest":
             return self._json(200, material_lists.latest(conn, user, query))
+        if path == "/api/material-lists/project-estimate":
+            return self._json(200, material_lists.project_estimate(conn, user, query))
         if path == "/api/suppliers/quote-options":
             return self._json(200, material_lists.quote_supplier_options(conn, user))
         m = _MATERIAL_LIST_RFQ_RE.match(path)

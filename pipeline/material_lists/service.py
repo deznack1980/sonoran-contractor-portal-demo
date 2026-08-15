@@ -60,7 +60,8 @@ def _serialize(conn: sqlite3.Connection, list_id: int) -> dict:
                    sku_snapshot AS sku, supplier_price_snapshot AS supplier_price,
                    quantity_available_snapshot AS quantity_available,
                    lead_time_days_snapshot AS lead_time_days,
-                   allow_substitution, match_status
+                   allow_substitution, suggestion_source, estimate_confidence_pct,
+                   estimate_rationale, quantity_status, match_status
             FROM material_list_items
             WHERE material_list_id=?
             ORDER BY line_number, id
@@ -92,6 +93,54 @@ def latest(conn: sqlite3.Connection, user: dict, params: dict) -> dict:
         values.append(int(project_id))
     row = conn.execute(sql, values).fetchone()
     return {"item": _serialize(conn, row["id"]) if row else None}
+
+
+def project_estimate(conn: sqlite3.Connection, user: dict, params: dict) -> dict:
+    """Return the explainable preliminary material estimate for one project.
+
+    This is intentionally category-level guidance. Permit records rarely
+    contain fixture schedules or takeoff quantities, so no quantity is
+    invented; the user must confirm every quantity before pricing or RFQ.
+    """
+    require_permission(user, "projects.view_assigned")
+    try:
+        company_id = int(params.get("company_id"))
+        project_id = int(params.get("project_id"))
+    except (TypeError, ValueError):
+        raise ValidationError("company_id and project_id are required")
+    _require_company_access(conn, user, company_id)
+    project = conn.execute(
+        """
+        SELECT pr.id AS project_id,pr.project_category,pr.project_lifecycle,
+               pr.estimated_plumbing_scope,pr.estimated_material_value,
+               pr.confidence_score,pr.analysis_version,pr.analyzed_at,
+               p.permit_number,p.permit_type,p.description,p.job_address,
+               p.city,p.state,p.zip AS postal_code
+        FROM projects pr JOIN permits p ON p.id=pr.permit_id
+        WHERE pr.id=? AND pr.contractor_company_id=?
+        """,
+        (project_id, company_id),
+    ).fetchone()
+    if project is None:
+        raise ValidationError("project does not belong to this contractor")
+    materials = [dict(row) for row in conn.execute(
+        "SELECT material_name,confidence_pct,rationale FROM estimated_materials "
+        "WHERE project_id=? ORDER BY confidence_pct DESC,material_name",
+        (project_id,),
+    ).fetchall()]
+    return {
+        "project": dict(project),
+        "suggestions": [
+            {"description": row["material_name"], "confidence_pct": row["confidence_pct"],
+             "rationale": row["rationale"], "quantity": None,
+             "quantity_status": "needs_confirmation", "suggestion_source": "project_estimate"}
+            for row in materials
+        ],
+        "quantity_policy": (
+            "Quantities are not inferred from permit text. Confirm quantities against plans, "
+            "a fixture schedule, contractor takeoff, or field conditions before pricing."
+        ),
+    }
 
 
 def _list_for_access(conn: sqlite3.Connection, user: dict, list_id: int) -> dict:
@@ -129,6 +178,13 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
     rows = data.get("rows") or []
     if not isinstance(rows, list):
         raise ValidationError("rows must be a list")
+    if status != "draft":
+        pending = [raw for raw in rows if str(raw.get("description") or "").strip() and (
+            float(raw.get("qty") or raw.get("quantity") or 0) <= 0 or
+            str(raw.get("quantityStatus") or raw.get("quantity_status") or "confirmed").strip().lower()
+            == "needs_confirmation")]
+        if pending:
+            raise ValidationError("confirm every suggested material quantity before review or pricing")
 
     now = _now()
     list_raw = data.get("materialListId") or data.get("material_list_id")
@@ -186,21 +242,31 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
     for raw in rows:
         description = str(raw.get("description") or "").strip()
         quantity = float(raw.get("qty") or raw.get("quantity") or 0)
-        if not description or quantity <= 0:
+        quantity_status = str(raw.get("quantityStatus") or raw.get("quantity_status") or "confirmed").strip().lower()
+        if quantity_status not in {"needs_confirmation", "confirmed"}:
+            raise ValidationError("invalid quantity status")
+        if not description or (quantity <= 0 and quantity_status != "needs_confirmation"):
             continue
         line_number += 1
         product_raw = raw.get("productId") or raw.get("product_id")
         product_id = int(product_raw) if product_raw not in (None, "") else None
         match_status = "catalog" if product_id else "manual"
+        estimate_confidence = (raw.get("estimateConfidencePct") if raw.get("estimateConfidencePct") is not None
+                               else raw.get("estimate_confidence_pct"))
+        if estimate_confidence not in (None, ""):
+            estimate_confidence = float(estimate_confidence)
+            if not 0 <= estimate_confidence <= 100:
+                raise ValidationError("estimate confidence must be between 0 and 100")
         conn.execute(
             """
             INSERT INTO material_list_items (
                 material_list_id, line_number, product_id, quantity, unit,
                 requested_description, manufacturer, sku_snapshot,
                 supplier_price_snapshot, quantity_available_snapshot,
-                lead_time_days_snapshot, allow_substitution, match_status,
-                created_at, updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                lead_time_days_snapshot, allow_substitution, suggestion_source,
+                estimate_confidence_pct, estimate_rationale, quantity_status,
+                match_status, created_at, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 list_id, line_number, product_id, quantity,
@@ -214,7 +280,10 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
                 raw.get("leadTimeDays") if raw.get("leadTimeDays") is not None
                 else raw.get("lead_time_days"),
                 1 if raw.get("allowSubstitution", raw.get("allow_substitution", True)) else 0,
-                match_status, now, now,
+                str(raw.get("suggestionSource") or raw.get("suggestion_source") or "").strip() or None,
+                estimate_confidence,
+                str(raw.get("estimateRationale") or raw.get("estimate_rationale") or "").strip() or None,
+                quantity_status, match_status, now, now,
             ),
         )
 
@@ -325,6 +394,9 @@ def prepare_quote_request(conn: sqlite3.Connection, user: dict, list_id: int,
     material_list = _list_for_access(conn, user, list_id)
     if not material_list.get("rows"):
         raise ValidationError("add at least one material item before preparing a quote request")
+    if any(float(item.get("quantity") or 0) <= 0 or item.get("quantity_status") != "confirmed"
+           for item in material_list["rows"]):
+        raise ValidationError("confirm every suggested material quantity before preparing a quote request")
     try:
         supplier_id = int(data.get("supplier_id"))
     except (TypeError, ValueError):

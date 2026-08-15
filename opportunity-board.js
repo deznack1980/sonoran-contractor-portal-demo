@@ -64,6 +64,7 @@
         <div><span>Assigned to</span>${CIQ.esc(p.assigned_to || "Unassigned")}</div>
         <div><span>Material lists / RFQs</span>${Number(p.material_list_count || 0)} / ${Number(p.quote_request_count || 0)}</div>
       </div>
+      ${p.estimated_plumbing_scope ? `<div class="op-material-scope"><strong>Likely scope:</strong> ${CIQ.esc(p.estimated_plumbing_scope)}</div>` : ""}
       ${statusSelect(p)}
       <div class="op-card-actions">
         <a class="btn btn-sm btn-ghost" href="sales-company-profile.html?id=${p.company_id}">Open</a>

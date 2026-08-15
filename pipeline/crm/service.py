@@ -992,7 +992,7 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
                p.description, p.issued_date, p.first_seen_at, p.last_updated_at,
                pr.project_category, pr.project_lifecycle,
                pr.opportunity_score, pr.opportunity_date, pr.opportunity_timing,
-               pr.estimated_material_value,
+               pr.estimated_material_value,pr.estimated_plumbing_scope,
                (SELECT COUNT(*) FROM material_lists ml
                 WHERE ml.organization_id=r.organization_id AND ml.project_id=pr.id)
                    AS material_list_count,
