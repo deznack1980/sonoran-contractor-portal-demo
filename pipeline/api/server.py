@@ -40,7 +40,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-rfq-cart-v1"
+BUILD_ID = "2026-08-15-lead-integrity-r11"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
