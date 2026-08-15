@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest pyyaml requests
+        run: python -m pip install --disable-pip-version-check pytest pyyaml requests argon2-cffi
       - name: Check Python syntax
         run: python -m compileall -q pipeline scripts
       - name: Run launch-critical tests
