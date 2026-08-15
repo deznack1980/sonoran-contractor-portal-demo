@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 set "PORT=8780"
-set "BUILD=2026-08-15-verified-contractor-foundation-r15.3"
+set "BUILD=2026-08-15-secured-contractor-directory-r15.4"
 set "URL=http://127.0.0.1:%PORT%/login.html?build=%BUILD%"
 
 REM Prefer the Windows py launcher, then python.
