@@ -221,7 +221,9 @@
       });
       if (input.dataset.field === "description") {
         input.addEventListener("focus", () => { const row = rows.find((r) => r.id === input.closest("tr").dataset.id); if (input.value.trim().length >= 2) scheduleCatalogSearch(input, row); });
-        input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== input) closeCatalogPopup(); }, 0));
+        input.addEventListener("blur", () => setTimeout(() => {
+          if (catalogInput === input && document.activeElement !== input) closeCatalogPopup();
+        }, 0));
       }
     });
     $("bomBody").querySelectorAll('select[data-field="allowSubstitution"]').forEach((select) => {
