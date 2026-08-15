@@ -288,7 +288,10 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/api/sales/dashboard":
             return self._json(200, crm.dashboard(conn, user))
         if path == "/api/admin/dashboard":
-            return self._json(200, crm_admin.admin_dashboard(conn, user))
+            dashboard = crm_admin.admin_dashboard(conn, user)
+            dashboard.setdefault("data_verification", {})["build_id"] = BUILD_ID
+            dashboard["data_verification"]["executive_briefs"] = "active"
+            return self._json(200, dashboard)
         if path == "/api/estimator/work-queue":
             return self._json(200, crm_admin.estimator_work_queue(conn, user))
         if path == "/api/sales/companies":

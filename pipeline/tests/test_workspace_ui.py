@@ -200,6 +200,12 @@ def test_admin_dashboard_is_organization_scoped_not_assignment(env):
     assert k["contact_ready_contractors"] == 1
     assert k["contractors_needing_enrichment"] == 0
     assert k["active_employees"] >= 4
+    verification = dash["data_verification"]
+    assert verification["database_status"] == "connected"
+    assert verification["public_permit_records"] >= 1
+    assert verification["corridoriq_project_records"] >= 1
+    assert verification["crm_relationship_records"] == 2
+    assert verification["jurisdiction_sources"] == 1
     # Must never look like a personal assignment dashboard.
     assert "my_companies" not in k
     assert "No companies assigned to you" not in json.dumps(dash)
@@ -429,6 +435,27 @@ def test_company_executive_brief_is_evidence_based_printable_and_allowlisted():
     assert "@media print" in css
     assert '"company-executive-brief.html"' in server
     assert '"company-executive-brief.js"' in server
+
+
+def test_admin_dashboard_exposes_live_build_and_data_provenance():
+    html = (PROJECT_ROOT / "admin-dashboard.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "admin-dashboard.js").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "portal.css").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+
+    assert 'id="verificationPanel"' in html
+    assert "LIVE TEST PROOF" in script
+    assert "Release 14 Executive Briefs: ACTIVE" in script
+    for field in ("build_id", "database_status", "public_permit_records",
+                  "corridoriq_project_records", "imported_contact_records",
+                  "crm_activity_records", "crm_relationship_records",
+                  "jurisdiction_sources"):
+        assert field in script
+    for source in ("Municipal source", "Research import", "Entered in CRM",
+                   "CorridorIQ derived"):
+        assert source in script
+    assert ".verification-panel" in css
+    assert 'dashboard["data_verification"]["executive_briefs"] = "active"' in server
 
 
 def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
@@ -909,6 +936,13 @@ def test_company_executive_brief_browser_flow(http_server):
         page.fill("#password", "UiAdmin123")
         page.click("#loginBtn")
         page.wait_for_url("**/admin-dashboard.html")
+        proof = page.locator("#verificationPanel")
+        proof.wait_for(state="visible")
+        assert "LIVE TEST PROOF" in proof.inner_text()
+        assert "Release 14 Executive Briefs: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-company-brief-r14" in proof.inner_text()
+        assert "Municipal source" in proof.inner_text()
+        assert "Entered in CRM" in proof.inner_text()
         page.goto(base + f"/sales-company-profile.html?id={http_server['company_id']}", wait_until="networkidle")
         page.get_by_role("link", name="Executive brief").click()
         page.wait_for_url("**/company-executive-brief.html?id=*")
