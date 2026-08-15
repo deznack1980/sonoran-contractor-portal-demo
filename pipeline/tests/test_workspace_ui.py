@@ -527,7 +527,7 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
     assert "2026-08-15-verified-contractor-foundation-r15.3" in launcher
-    assert 'BUILD_ID = "2026-08-15-verified-contractor-foundation-r15.3"' in server
+    assert 'BUILD_ID = "2026-08-15-secured-contractor-directory-r15.4"' in server
 
 
 # --------------------------------------------------------------------------

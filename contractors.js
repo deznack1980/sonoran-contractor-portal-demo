@@ -1,137 +1,51 @@
-// contractors.js — fetches data/exports/contractor_matching.json and renders
-// the contractor matching page (searchable, filterable table).
-// Requires a local server, same as dashboard.js — see README.md.
+/* Verified Contractor Directory — secured API only. */
+(function () {
+  let page = 1;
+  const filters = { sort: "priority" };
+  const money = (value) => value == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
+  const number = (value) => value == null ? "—" : Number(value).toLocaleString("en-US");
 
-const EXPORTS_BASE = "data/exports";
-
-let allContractors = [];
-let jurisdictionNameLookup = {};
-
-async function fetchJSON(filename) {
-  const response = await fetch(`${EXPORTS_BASE}/${filename}`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to load ${filename}: HTTP ${response.status}`);
-  }
-  return response.json();
-}
-
-function formatMoney(value) {
-  if (value === null || value === undefined) return "—";
-  return "$" + Math.round(value).toLocaleString("en-US");
-}
-
-function formatPct(value) {
-  if (value === null || value === undefined) return "—";
-  return Math.round(value) + "%";
-}
-
-function escapeHtml(value) {
-  if (value === null || value === undefined || value === "") return "—";
-  const div = document.createElement("div");
-  div.textContent = String(value);
-  return div.innerHTML;
-}
-
-function jurisdictionLabel(slug) {
-  return jurisdictionNameLookup[slug] || slug;
-}
-
-function renderStatTiles(data) {
-  const grid = document.getElementById("statTileGrid");
-  const tiles = [
-    { value: data.total_contractors, label: "Contractors in directory" },
-    { value: data.multi_jurisdiction_count, label: "Matched across jurisdictions" },
-    { value: data.connected_jurisdictions.join(", ") || "None yet", label: "Connected jurisdictions" },
-  ];
-  grid.innerHTML = tiles
-    .map(
-      (t) => `
-      <div class="stat-tile">
-        <p class="stat-tile-value">${escapeHtml(t.value)}</p>
-        <p class="stat-tile-label">${escapeHtml(t.label)}</p>
-      </div>`
-    )
-    .join("");
-}
-
-function renderTable(contractors) {
-  const tbody = document.querySelector("#contractorsTable tbody");
-  document.getElementById("resultCount").textContent = `${contractors.length} contractor(s) shown`;
-
-  if (!contractors.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="dashboard-empty">No contractors match your filters.</td></tr>';
-    return;
+  function renderStats(data) {
+    const s = data.stats || {};
+    document.getElementById("contractorStats").innerHTML = [
+      ["Verified contractors", number(s.total)], ["Contact ready", number(s.contact_ready)],
+      ["Multi-jurisdiction", number(s.multi_jurisdiction)], ["Material opportunity", money(s.material_opportunity)],
+    ].map(([label, value]) => `<article class="metric-card"><span>${CIQ.esc(label)}</span><strong>${CIQ.esc(value)}</strong></article>`).join("");
   }
 
-  tbody.innerHTML = contractors
-    .map((c) => {
-      const badges = c.jurisdictions_worked
-        .map((slug) => {
-          const count = c.jurisdiction_breakdown[slug] || 0;
-          return `<span class="status-chip status-chip-connected jurisdiction-badge">${escapeHtml(jurisdictionLabel(slug))} (${escapeHtml(count)})</span>`;
-        })
-        .join(" ");
-
-      return `
-      <tr>
-        <td>${escapeHtml(c.name)}${c.is_multi_jurisdiction ? ' <span class="status-chip status-chip-connected">Multi-market</span>' : ""}</td>
-        <td>${badges}</td>
-        <td>${escapeHtml(c.permit_count)}</td>
-        <td>${formatPct(c.commercial_pct)}</td>
-        <td>${formatMoney(c.avg_project_value)}</td>
-        <td>${escapeHtml(c.growth_trend)}</td>
-        <td class="score-cell">${escapeHtml(c.opportunity_rating)}</td>
-        <td>${escapeHtml((c.last_permit_date || "").slice(0, 10))}</td>
-      </tr>`;
-    })
-    .join("");
-}
-
-function applyFilters() {
-  const query = document.getElementById("searchInput").value.trim().toLowerCase();
-  const multiOnly = document.getElementById("multiOnlyToggle").checked;
-
-  let filtered = allContractors;
-  if (multiOnly) {
-    filtered = filtered.filter((c) => c.is_multi_jurisdiction);
+  function card(c) {
+    const jurisdictions = (c.jurisdictions_worked || []).map((name) => `<span class="badge slate">${CIQ.esc(name)} · ${number((c.jurisdiction_breakdown || {})[name] || 0)}</span>`).join("");
+    return `<article class="contractor-card">
+      <div class="contractor-card-head"><div><a class="contractor-name" href="sales-company-profile.html?id=${Number(c.company_id)}">${CIQ.esc(c.display_name || c.name)}</a><div class="muted">${c.license_number ? `License ${CIQ.esc(c.license_number)} · ` : ""}${CIQ.esc(CIQ.titleCase(c.contractor_type || "contractor"))}</div></div>
+      <div class="contractor-badges"><span class="badge green">Verified</span><span class="badge ${c.has_contact_info ? "green" : "amber"}">${c.has_contact_info ? "Contact ready" : "Needs contact"}</span></div></div>
+      <div class="contractor-metrics">
+        <div><span>Opportunity</span><strong>${number(c.opportunity_rating)}</strong></div><div><span>Permits</span><strong>${number(c.permit_count)}</strong></div>
+        <div><span>Commercial</span><strong>${number(c.commercial_pct)}%</strong></div><div><span>Avg project</span><strong>${money(c.avg_project_value)}</strong></div>
+        <div><span>Annual volume</span><strong>${money(c.estimated_annual_volume)}</strong></div><div><span>Material opportunity</span><strong>${money(c.estimated_material_opportunity)}</strong></div>
+        <div><span>Growth</span><strong>${CIQ.esc(CIQ.titleCase(c.growth_trend || "—"))}</strong></div><div><span>Last permit</span><strong>${CIQ.fmtDate(c.last_permit_date)}</strong></div>
+      </div><div class="contractor-jurisdictions">${jurisdictions || '<span class="muted">No jurisdiction metrics</span>'}</div>
+      <details class="contractor-proof"><summary>Verification evidence</summary><p><strong>Source:</strong> ${CIQ.esc(c.classification_source || "—")}</p><p><strong>Rule:</strong> ${CIQ.esc(c.classification_rule || "—")}</p><p><strong>Evidence permits:</strong> ${number(c.contractor_evidence_count)} · <strong>Model:</strong> ${CIQ.esc(c.classification_version || "—")}</p></details>
+      <div class="contractor-actions"><a class="btn btn-primary btn-sm" href="sales-company-profile.html?id=${Number(c.company_id)}">Open company</a></div></article>`;
   }
-  if (query) {
-    filtered = filtered.filter((c) => c.name.toLowerCase().includes(query));
+
+  async function load() {
+    const results = document.getElementById("contractorResults"); results.innerHTML = CIQ.skeletonRows(4);
+    const params = new URLSearchParams({ page: String(page), page_size: "24", ...filters });
+    try {
+      const data = await CIQ.api.get("/api/contractors?" + params.toString()); renderStats(data);
+      results.className = data.items.length ? "contractor-grid" : "";
+      results.innerHTML = data.items.length ? data.items.map(card).join("") : CIQ.emptyState({ icon: "▤", title: "No verified contractors match", text: "Adjust the filters or complete the contractor rebuild after production audit approval." });
+      CIQ.pager(document.getElementById("contractorPager"), { page: data.page, pages: data.pages, total: data.total, onPage: (next) => { page = next; load(); window.scrollTo(0, 0); } });
+    } catch (error) { results.className = ""; results.innerHTML = CIQ.errorBanner(error.message); }
   }
-  renderTable(filtered);
-}
 
-async function loadContractorMatching() {
-  const loadingEl = document.getElementById("loadingState");
-  const errorEl = document.getElementById("errorState");
-  const contentEl = document.getElementById("matchingContent");
-
-  try {
-    const [matching, jurisdictions] = await Promise.all([
-      fetchJSON("contractor_matching.json"),
-      fetchJSON("jurisdictions_status.json"),
-    ]);
-
-    jurisdictionNameLookup = Object.fromEntries(jurisdictions.jurisdictions.map((j) => [j.slug, j.name]));
-    allContractors = matching.contractors;
-
-    renderStatTiles(matching);
-    applyFilters();
-
-    document.getElementById("generatedAt").textContent = `Data as of ${new Date(matching.generated_at).toLocaleString()}`;
-    document.getElementById("searchInput").addEventListener("input", applyFilters);
-    document.getElementById("multiOnlyToggle").addEventListener("change", applyFilters);
-
-    loadingEl.style.display = "none";
-    contentEl.style.display = "block";
-  } catch (err) {
-    loadingEl.style.display = "none";
-    errorEl.style.display = "block";
-    errorEl.textContent =
-      "Couldn't load live data. If you opened this file directly in your browser, run a local server instead " +
-      "(python -m http.server 8000, then visit http://localhost:8000/contractors.html) — browsers block fetching " +
-      "local files over file://. Details: " + err.message;
-  }
-}
-
-document.addEventListener("DOMContentLoaded", loadContractorMatching);
+  document.addEventListener("DOMContentLoaded", async () => {
+    const user = await CIQ.guard("companies.view", { title: "Verified Contractor Directory", subtitle: "Accurate companies, complete metrics, traceable evidence", active: "contractors.html" });
+    if (!user) return;
+    const search = document.getElementById("contractorSearch");
+    search.addEventListener("input", CIQ.debounce(() => { filters.q = search.value.trim(); page = 1; load(); }, 300));
+    document.getElementById("contractorContact").addEventListener("change", (event) => { filters.contact = event.target.value; page = 1; load(); });
+    document.getElementById("contractorSort").addEventListener("change", (event) => { filters.sort = event.target.value; page = 1; load(); });
+    document.getElementById("contractorMulti").addEventListener("change", (event) => { filters.multi = event.target.checked ? "1" : ""; page = 1; load(); }); load();
+  });
+})();

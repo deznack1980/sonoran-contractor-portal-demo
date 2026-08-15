@@ -79,6 +79,7 @@
         { label: null, items: [
           { href: "admin-dashboard.html", label: "Dashboard", icon: "▦" },
           { href: "my-companies.html", label: "Companies", icon: "⌂", perm: "companies.view" },
+          { href: "contractors.html", label: "Contractor Directory", icon: "▤", perm: "companies.view" },
           { href: "opportunities.html", label: "Project Records", icon: "◎", perm: "projects.view" },
           { href: "opportunity-board.html", label: "Opportunity Pipeline", icon: "⚡", perm: "projects.view" },
           { href: "estimator-work-queue.html", label: "Estimates", icon: "$", perm: "projects.view" },

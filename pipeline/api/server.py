@@ -32,6 +32,7 @@ from pipeline.crm import service as crm
 from pipeline.crm.service import ValidationError
 from pipeline.products import service as products
 from pipeline.material_lists import service as material_lists
+from pipeline.contractors import directory as contractor_directory
 from pipeline.reports import catalog as reports_catalog
 from pipeline import pipeline_runs
 from pipeline import contact_enrichment
@@ -42,7 +43,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-verified-contractor-foundation-r15.3"
+BUILD_ID = "2026-08-15-secured-contractor-directory-r15.4"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -68,6 +69,7 @@ _PORTAL_PAGES = {
     # Admin contact enrichment workflow.
     "contact-enrichment-admin.html", "contact-enrichment-admin.js",
     "intelligence-import.html", "intelligence-import.js",
+    "contractors.html", "contractors.js",
 }
 
 _ID = r"(\d+)"
@@ -300,6 +302,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self._json(200, crm_admin.estimator_work_queue(conn, user))
         if path == "/api/sales/companies":
             return self._json(200, crm.list_my_companies(conn, user, query))
+        if path == "/api/contractors":
+            return self._json(200, contractor_directory.list_contractors(conn, user, query))
         if path == "/api/sales/opportunities":
             return self._json(200, crm.opportunities(conn, user, query))
         if path == "/api/sales/activity":
