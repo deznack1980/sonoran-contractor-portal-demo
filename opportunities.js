@@ -50,6 +50,7 @@
         <div><span>Company permit history</span>${p.company_permit_count != null ? p.company_permit_count : "—"}</div>
         <div><span>Est. value</span>${p.estimated_material_value != null ? CIQ.money(p.estimated_material_value) : "—"}</div>
       </div>
+      ${p.estimated_plumbing_scope ? `<div class="cc-reason"><strong>Likely material scope:</strong> ${CIQ.esc(p.estimated_plumbing_scope)}</div>` : ""}
       ${p.why_this_lead ? `<div class="cc-reason"><strong>Why this lead:</strong> ${CIQ.esc(truncate(p.why_this_lead, 160))}</div>` : ""}
       ${p.description ? `<div class="cc-reason">${CIQ.esc(truncate(p.description, 120))}</div>` : ""}
       <div class="cc-quick">

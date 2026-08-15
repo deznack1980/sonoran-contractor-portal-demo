@@ -263,6 +263,9 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
     public_bid_planholders = _n("SELECT COUNT(*) AS n FROM public_bid_planholders")
     matched_public_planholders = _n(
         "SELECT COUNT(*) AS n FROM public_bid_planholders WHERE company_id IS NOT NULL")
+    project_material_estimates = _n(
+        "SELECT COUNT(DISTINCT project_id) AS n FROM estimated_materials")
+    estimated_material_categories = _n("SELECT COUNT(*) AS n FROM estimated_materials")
     jurisdiction_sources = _n("SELECT COUNT(*) AS n FROM jurisdictions")
 
     refresh = pipeline_runs.admin_status(conn)
@@ -360,6 +363,8 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
             "live_public_bids": live_public_bids,
             "public_bid_planholders": public_bid_planholders,
             "matched_public_planholders": matched_public_planholders,
+            "project_material_estimates": project_material_estimates,
+            "estimated_material_categories": estimated_material_categories,
             "jurisdiction_sources": jurisdiction_sources,
             "latest_source_refresh": simple.get("last_completed"),
         },

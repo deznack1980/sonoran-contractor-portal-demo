@@ -1106,6 +1106,11 @@ CREATE TABLE IF NOT EXISTS material_list_items (
     quantity_available_snapshot REAL,
     lead_time_days_snapshot     INTEGER,
     allow_substitution          INTEGER NOT NULL DEFAULT 1,
+    suggestion_source          TEXT,
+    estimate_confidence_pct     REAL,
+    estimate_rationale          TEXT,
+    quantity_status             TEXT NOT NULL DEFAULT 'confirmed'
+                                CHECK(quantity_status IN ('needs_confirmation','confirmed')),
     match_status                TEXT NOT NULL DEFAULT 'manual'
                                 CHECK(match_status IN ('catalog','manual')),
     created_at                  TEXT NOT NULL,

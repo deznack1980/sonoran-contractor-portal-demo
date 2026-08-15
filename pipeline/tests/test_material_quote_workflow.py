@@ -66,6 +66,28 @@ def env():
         "VALUES ('ACME PLUMBING','Acme Plumbing','Phoenix','AZ',?,?)",
         (now, now),
     ).lastrowid
+    conn.execute(
+        "INSERT INTO jurisdictions (slug,name,state,status) VALUES ('phoenix','Phoenix','AZ','connected')"
+    )
+    permit_id = conn.execute(
+        "INSERT INTO permits (jurisdiction,permit_number,permit_type,status,description,job_address,city,state,zip,"
+        "contractor_company_id,first_seen_at,last_updated_at) VALUES "
+        "('phoenix','PMT-EST-1','Commercial plumbing','Issued','Restroom plumbing and backflow',"
+        "'123 Main Street','Phoenix','AZ','85004',?,?,?)",
+        (company_id, now, now),
+    ).lastrowid
+    project_id = conn.execute(
+        "INSERT INTO projects (permit_id,jurisdiction,project_category,project_lifecycle,"
+        "estimated_plumbing_scope,estimated_material_value,confidence_score,analysis_version,analyzed_at,"
+        "contractor_company_id) VALUES (?,'phoenix','Commercial','Permit Issued',"
+        "'Commercial Fixtures, Backflow, Valves',18500,88,'test-estimator',?,?)",
+        (permit_id, now, company_id),
+    ).lastrowid
+    conn.executemany(
+        "INSERT INTO estimated_materials (project_id,material_name,confidence_pct,rationale) VALUES (?,?,?,?)",
+        [(project_id, "Commercial Fixtures", 90, "Restroom keyword"),
+         (project_id, "Backflow", 85, "Backflow keyword")],
+    )
     conn.commit()
 
     admin = _ctx(conn, admin_id)
@@ -86,6 +108,7 @@ def env():
         "conn": conn, "org": org, "company": company_id, "admin": admin,
         "rep": rep, "other_rep": _ctx(conn, other_rep_id),
         "ready_supplier": ready_supplier, "incomplete_supplier": incomplete_supplier,
+        "project": project_id,
     }
     conn.close()
 
@@ -121,6 +144,45 @@ def test_material_list_persists_required_rfq_fields_and_alternate_policy(env):
     assert material_list["quote_needed_by"] == "2026-08-17"
     assert material_list["jobsite_postal_code"] == "85004"
     assert [row["allow_substitution"] for row in material_list["rows"]] == [1, 0]
+
+
+def test_project_estimate_is_job_specific_explainable_and_requires_quantities(env):
+    estimate = material_lists.project_estimate(
+        env["conn"], env["rep"], {"company_id": env["company"], "project_id": env["project"]})
+    assert estimate["project"]["permit_number"] == "PMT-EST-1"
+    assert estimate["project"]["estimated_material_value"] == 18500
+    assert [item["description"] for item in estimate["suggestions"]] == ["Commercial Fixtures", "Backflow"]
+    assert estimate["suggestions"][0]["confidence_pct"] == 90
+    assert estimate["suggestions"][0]["quantity"] is None
+    assert "not inferred" in estimate["quantity_policy"]
+    with pytest.raises(crm.ValidationError, match="assigned"):
+        material_lists.project_estimate(
+            env["conn"], env["other_rep"],
+            {"company_id": env["company"], "project_id": env["project"]})
+
+    saved = material_lists.save(env["conn"], env["rep"], {
+        "companyId": env["company"], "projectId": env["project"],
+        "projectName": "123 Main Street", "status": "draft",
+        "rows": [{"qty": 0, "description": "Commercial Fixtures", "unit": "confirm",
+                  "suggestionSource": "project_estimate", "estimateConfidencePct": 90,
+                  "estimateRationale": "Restroom keyword", "quantityStatus": "needs_confirmation"}],
+    })["item"]
+    assert saved["rows"][0]["quantity"] == 0
+    assert saved["rows"][0]["suggestion_source"] == "project_estimate"
+    assert saved["rows"][0]["quantity_status"] == "needs_confirmation"
+    with pytest.raises(crm.ValidationError, match="confirm every suggested"):
+        material_lists.save(env["conn"], env["rep"], {
+            "materialListId": saved["id"], "companyId": env["company"],
+            "projectId": env["project"], "projectName": "123 Main Street",
+            "status": "ready for review",
+            "rows": [{"qty": 0, "description": "Commercial Fixtures", "unit": "confirm",
+                      "suggestionSource": "project_estimate", "estimateConfidencePct": 90,
+                      "quantityStatus": "needs_confirmation"}],
+        })
+    with pytest.raises(crm.ValidationError, match="confirm every suggested"):
+        material_lists.prepare_quote_request(
+            env["conn"], env["rep"], saved["id"],
+            {"supplier_id": env["ready_supplier"]["id"]})
 
 
 def test_supplier_options_prioritize_quote_ready_contacts(env):

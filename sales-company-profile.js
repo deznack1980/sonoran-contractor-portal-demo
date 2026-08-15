@@ -192,6 +192,7 @@
         <div><span>Opportunity</span>${p.opportunity_date ? CIQ.fmtDate(p.opportunity_date) : "—"}</div>
         <div><span>Est. value</span>${p.estimated_material_value != null ? CIQ.money(p.estimated_material_value) : "—"}</div>
       </div>
+      ${p.estimated_plumbing_scope ? `<div class="cc-reason"><strong>Likely material scope:</strong> ${CIQ.esc(p.estimated_plumbing_scope)}</div>` : ""}
       <div class="cc-quick">
         <button class="btn btn-sm" data-p="${p.project_id}" data-a="pdetail">View details</button>
         <a class="btn btn-sm btn-primary" href="material-list-intake.html?company_id=${companyId}&project_id=${p.project_id}">Build material list</a>
