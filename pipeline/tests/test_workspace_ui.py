@@ -360,6 +360,21 @@ def test_project_records_ui_exposes_lead_integrity_queues():
     assert "ApplyCorridorIQLeadIntegrity.bat" in script
 
 
+def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
+    rollout = (PROJECT_ROOT / "scripts" / "apply_lead_integrity.py").read_text(encoding="utf-8")
+    one_click = (PROJECT_ROOT / "ApplyCorridorIQLeadIntegrity.bat").read_text(encoding="utf-8")
+    launcher = (PROJECT_ROOT / "CorridorIQHQ.bat").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+
+    assert "conn.backup(target)" in rollout
+    assert "PRAGMA quick_check" in rollout
+    assert "nonverified_project_links" in rollout
+    assert "replace_permit_events=True" in rollout
+    assert "apply_lead_integrity.py\" --apply" in one_click
+    assert "2026-08-15-lead-integrity-r11" in launcher
+    assert 'BUILD_ID = "2026-08-15-lead-integrity-r11"' in server
+
+
 # --------------------------------------------------------------------------
 # Personal activity feed
 # --------------------------------------------------------------------------
