@@ -260,16 +260,16 @@ def export_high_opportunity_projects(conn: sqlite3.Connection) -> None:
     rows = conn.execute(
         """
         SELECT p.permit_number, p.jurisdiction, p.city, p.job_address,
-               COALESCE(
-                 NULLIF(trim(p.general_contractor_name), ''),
-                 NULLIF(trim(p.plumbing_contractor_name), ''),
-                 NULLIF(trim(p.owner_name), '')
-               ) AS general_contractor_name,
+               c.display_name AS general_contractor_name,
                pr.id AS project_id, pr.project_category, pr.construction_stage,
                pr.project_lifecycle, pr.opportunity_date, pr.opportunity_timing,
                pr.opportunity_score, pr.confidence_score, pr.estimated_material_value,
                pr.estimated_gross_profit, pr.estimated_plumbing_scope
         FROM projects pr JOIN permits p ON p.id = pr.permit_id
+        LEFT JOIN companies c ON c.id=pr.contractor_company_id
+             AND c.lifecycle_state='active'
+             AND c.lead_type='verified_contractor'
+             AND c.lead_verification_status='verified'
         WHERE pr.opportunity_score IS NOT NULL
         ORDER BY pr.opportunity_score DESC
         LIMIT ?
@@ -285,9 +285,11 @@ def export_high_opportunity_projects(conn: sqlite3.Connection) -> None:
 def export_contractors(conn: sqlite3.Connection) -> None:
     rows = conn.execute(
         """
-        SELECT name, contractor_type, cities_worked, permit_count, first_permit_date,
+        SELECT company_id,name, contractor_type, cities_worked, permit_count, first_permit_date,
                last_permit_date, estimated_annual_volume, commercial_pct, residential_pct,
-               avg_project_value, largest_project_value, growth_trend, opportunity_rating
+               avg_project_value, largest_project_value, growth_trend, opportunity_rating,
+               estimated_material_opportunity,has_contact_info,verification_status,
+               classification_source,classification_rule,classification_version
         FROM contractors
         ORDER BY last_permit_date DESC
         LIMIT ?
@@ -309,11 +311,13 @@ def export_contractor_matching(conn: sqlite3.Connection) -> None:
     """
     rows = conn.execute(
         """
-        SELECT name, license_number, contractor_type, cities_worked,
+        SELECT company_id,name, license_number, contractor_type, cities_worked,
                jurisdictions_worked, jurisdiction_breakdown, permit_count,
                first_permit_date, last_permit_date, commercial_pct,
                avg_project_value, largest_project_value, growth_trend,
-               opportunity_rating
+               opportunity_rating,estimated_annual_volume,estimated_material_opportunity,
+               has_contact_info,verification_status,classification_source,
+               classification_rule,classification_version
         FROM contractors
         ORDER BY
             (json_array_length(jurisdictions_worked) > 1) DESC,

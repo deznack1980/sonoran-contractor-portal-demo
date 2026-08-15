@@ -266,6 +266,19 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
     project_material_estimates = _n(
         "SELECT COUNT(DISTINCT project_id) AS n FROM estimated_materials")
     estimated_material_categories = _n("SELECT COUNT(*) AS n FROM estimated_materials")
+    verified_contractor_directory = _n(
+        "SELECT COUNT(*) AS n FROM contractors ct JOIN companies c ON c.id=ct.company_id "
+        "WHERE c.lifecycle_state='active' AND c.lead_type='verified_contractor' "
+        "AND c.lead_verification_status='verified'")
+    noncanonical_contractor_directory = _n(
+        "SELECT COUNT(*) AS n FROM contractors WHERE company_id IS NULL")
+    verified_projects_unlinked = _n(
+        "SELECT COUNT(*) AS n FROM projects pr "
+        "JOIN companies c ON c.id=pr.contractor_company_id "
+        "LEFT JOIN contractors ct ON ct.company_id=c.id "
+        "WHERE c.lifecycle_state='active' AND c.lead_type='verified_contractor' "
+        "AND c.lead_verification_status='verified' "
+        "AND (ct.id IS NULL OR pr.contractor_id IS NULL OR pr.contractor_id<>ct.id)")
     jurisdiction_sources = _n("SELECT COUNT(*) AS n FROM jurisdictions")
 
     refresh = pipeline_runs.admin_status(conn)
@@ -365,6 +378,9 @@ def admin_dashboard(conn: sqlite3.Connection, user: dict) -> dict:
             "matched_public_planholders": matched_public_planholders,
             "project_material_estimates": project_material_estimates,
             "estimated_material_categories": estimated_material_categories,
+            "verified_contractor_directory": verified_contractor_directory,
+            "noncanonical_contractor_directory": noncanonical_contractor_directory,
+            "verified_projects_unlinked": verified_projects_unlinked,
             "jurisdiction_sources": jurisdiction_sources,
             "latest_source_refresh": simple.get("last_completed"),
         },

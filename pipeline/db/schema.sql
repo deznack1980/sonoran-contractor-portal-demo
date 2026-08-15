@@ -155,6 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_est_materials_project ON estimated_materials(proj
 -- ============================================================
 CREATE TABLE IF NOT EXISTS contractors (
     id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id                 INTEGER REFERENCES companies(id),
     name                       TEXT NOT NULL,
     normalized_name              TEXT NOT NULL,
     license_number               TEXT,
@@ -175,11 +176,19 @@ CREATE TABLE IF NOT EXISTS contractors (
     largest_project_permit_id         INTEGER REFERENCES permits(id),
     growth_trend                  TEXT,
     opportunity_rating              REAL,
+    estimated_material_opportunity   REAL,
+    has_contact_info                 INTEGER NOT NULL DEFAULT 0,
+    verification_status              TEXT,
+    classification_source            TEXT,
+    classification_rule              TEXT,
+    classification_version           TEXT,
+    contractor_evidence_count        INTEGER NOT NULL DEFAULT 0,
     updated_at                   TEXT NOT NULL,
     UNIQUE(normalized_name)
 );
 CREATE INDEX IF NOT EXISTS idx_contractors_name        ON contractors(normalized_name);
 CREATE INDEX IF NOT EXISTS idx_contractors_opportunity  ON contractors(opportunity_rating DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contractors_company ON contractors(company_id);
 
 -- ============================================================
 -- suppliers / quotes / deliveries: launch empty. No fabricated
@@ -711,6 +720,21 @@ CREATE TABLE IF NOT EXISTS company_intelligence (
     activity_trend      TEXT,
     company_priority_score REAL,
     company_priority_tier  TEXT,
+    contractor_permit_count INTEGER,
+    contractor_jurisdictions_worked TEXT,
+    contractor_jurisdiction_breakdown TEXT,
+    contractor_commercial_pct REAL,
+    contractor_average_project_value REAL,
+    contractor_last_permit_date TEXT,
+    contractor_estimated_annual_volume REAL,
+    contractor_estimated_material_opportunity REAL,
+    contractor_opportunity_rating REAL,
+    contractor_has_contact_info INTEGER,
+    contractor_verification_status TEXT,
+    contractor_classification_source TEXT,
+    contractor_classification_rule TEXT,
+    contractor_classification_version TEXT,
+    contractor_metrics_calculated_at TEXT,
     metrics_calculated_at TEXT,
     model_version       TEXT
 );
