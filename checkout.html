@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Checkout</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <div class="page-head"><div><h2>Checkout</h2><div class="sub">Review supplier line items before submitting.</div></div></div>
+    <div id="checkoutLines"></div>
+    <section class="card" style="margin-top:16px">
+      <div class="card-body spread"><strong>Total</strong><strong id="checkoutTotal">$0.00</strong></div>
+      <div class="card-body"><button class="btn btn-primary btn-block" id="placeOrderBtn" type="button">Submit checkout</button></div>
+    </section>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="checkout.js"></script>
+</body>
+</html>

@@ -50,4 +50,10 @@ def upsert_permit(conn: sqlite3.Connection, mapped: dict, *, detect_unchanged: b
     values["last_updated_at"] = now
     values["id"] = existing["id"]
     conn.execute(f"UPDATE permits SET {set_clause} WHERE id = :id", values)
+    # A changed contractor identity invalidates the permit-specific canonical
+    # link. The explicit-evidence rebuild will relink it; preserving the old ID
+    # would keep a stale applicant/professional relationship.
+    if existing["general_contractor_name"] != mapped.get("general_contractor_name"):
+        conn.execute("UPDATE permits SET contractor_company_id=NULL WHERE id=?", (existing["id"],))
+        conn.execute("UPDATE projects SET contractor_company_id=NULL WHERE permit_id=?", (existing["id"],))
     return "updated"

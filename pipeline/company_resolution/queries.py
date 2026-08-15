@@ -22,6 +22,13 @@ _ROLE_COLUMNS = (
     "engineer_company_id",
 )
 
+_CONTACT_INFO_SQL = (
+    "(TRIM(COALESCE(c.main_phone,''))<>'' OR TRIM(COALESCE(c.main_email,''))<>'' "
+    "OR TRIM(COALESCE(c.website,''))<>'' OR EXISTS (SELECT 1 FROM contacts ct "
+    "WHERE ct.company_id=c.id AND (TRIM(COALESCE(ct.phone,''))<>'' OR "
+    "TRIM(COALESCE(ct.mobile_phone,''))<>'' OR TRIM(COALESCE(ct.email,''))<>'')))"
+)
+
 
 def _clamp_page_size(value) -> int:
     try:
@@ -33,7 +40,9 @@ def _clamp_page_size(value) -> int:
 
 def _roles_for(conn: sqlite3.Connection, company_id: int) -> list[str]:
     return [r["role_type"] for r in conn.execute(
-        "SELECT role_type FROM company_roles WHERE company_id=? ORDER BY is_primary DESC, role_type",
+        "SELECT role_type FROM company_roles WHERE company_id=? "
+        "AND (role_type<>'contractor' OR verification_status='verified' OR verification_status IS NULL) "
+        "ORDER BY is_primary DESC, role_type",
         (company_id,),
     )]
 
@@ -53,8 +62,14 @@ def list_companies(conn: sqlite3.Connection, filters: dict) -> dict:
 
     role = (filters.get("role") or "").strip()
     if role:
-        where.append("EXISTS (SELECT 1 FROM company_roles r WHERE r.company_id=c.id AND r.role_type=?)")
+        where.append("EXISTS (SELECT 1 FROM company_roles r WHERE r.company_id=c.id AND r.role_type=? "
+                     "AND (r.role_type<>'contractor' OR r.verification_status='verified' OR r.verification_status IS NULL))")
         params.append(role)
+
+    lead_type = (filters.get("lead_type") or "").strip()
+    if lead_type and lead_type != "all":
+        where.append("c.lead_type=?")
+        params.append(lead_type)
 
     tier = (filters.get("tier") or "").strip()
     if tier:
@@ -91,18 +106,25 @@ def list_companies(conn: sqlite3.Connection, filters: dict) -> dict:
     rows = conn.execute(
         f"""
         SELECT c.id, c.display_name, c.normalized_name, c.city, c.state,
-               c.company_type_primary, c.license_number,
+               c.company_type_primary, c.license_number, c.lead_type,
+               c.lead_verification_status, c.lead_source, c.why_this_lead,
                ci.company_priority_score, ci.company_priority_tier,
                ci.total_projects, ci.active_projects, ci.projects_last_30_days,
                ci.average_opportunity_score, ci.highest_opportunity_score,
                ci.municipality_count, ci.commercial_project_count,
                ci.residential_project_count, ci.activity_trend,
-               ci.latest_activity_date, ci.estimated_opportunity_total
+               ci.latest_activity_date, ci.estimated_opportunity_total,
+               CASE WHEN {_CONTACT_INFO_SQL} THEN 1 ELSE 0 END AS has_contact_info
         FROM companies c
         LEFT JOIN company_intelligence ci ON ci.company_id=c.id
         WHERE {where_sql}
-        ORDER BY COALESCE(ci.company_priority_score,0) DESC,
-                 ci.latest_activity_date DESC, c.display_name
+        ORDER BY CASE WHEN c.lead_type='verified_contractor' THEN 0 ELSE 1 END,
+                 has_contact_info DESC,
+                 COALESCE(ci.projects_last_30_days,0) DESC,
+                 COALESCE(ci.active_projects,0) DESC,
+                 COALESCE(ci.highest_opportunity_score,0) DESC,
+                 COALESCE(ci.estimated_opportunity_total,0) DESC,
+                 c.display_name
         LIMIT ? OFFSET ?
         """,
         [*params, page_size, (page - 1) * page_size],

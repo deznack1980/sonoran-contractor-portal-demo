@@ -125,7 +125,9 @@ def _resolve_and_link(
         company_id = result.company_id
         enrich_company(conn, company_id, data)
         add_alias(conn, company_id, raw_name.strip(), source="permits")
-        ensure_role(conn, company_id, role_type, source="permits")
+        ensure_role(conn, company_id, role_type, source="permits",
+                    verification_status="verified" if role_type == "contractor" else None,
+                    evidence_source="permit_explicit_field" if role_type == "contractor" else None)
 
     changed = False
     if project_id is not None:

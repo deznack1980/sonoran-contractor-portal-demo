@@ -61,6 +61,10 @@ function renderOverview(data) {
   const kv = document.getElementById("overviewKv");
   const rows = [
     ["Canonical name", c.display_name || c.legal_name || "—"],
+    ["Lead Type", (c.lead_type || "unverified_permit_contact").replaceAll("_", " ")],
+    ["Verification", (c.lead_verification_status || "unverified").replaceAll("_", " ")],
+    ["Source", c.lead_source || "—"],
+    ["Why this lead", c.why_this_lead || "—"],
     ["Normalized", c.normalized_name],
     ["City / State", `${c.city || "—"}, ${c.state || "—"}`],
     ["License", c.license_number ? `${c.license_number} (${c.license_state || "?"})` : "—"],

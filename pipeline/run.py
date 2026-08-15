@@ -58,11 +58,15 @@ def cmd_companies(conn):
     from pipeline.company_resolution.backfill import backfill_companies
     from pipeline.company_resolution.export import export_all as export_companies
     from pipeline.company_resolution.metrics import compute_company_metrics
+    from pipeline.company_resolution.lead_role_correction import apply_lead_role_correction
     from pipeline.company_resolution.timeline import rebuild_company_timeline
 
     print("=== Company identity backfill ===")
     stats = backfill_companies(conn, resume=True)
     print(f"  {stats.as_dict()}")
+    print("=== Lead-role classification ===")
+    lead_stats = apply_lead_role_correction(conn)
+    print(f"  {lead_stats['assignment_stats']}")
     print("=== Company metrics ===")
     n = compute_company_metrics(conn)
     print(f"  metrics for {n} companies")

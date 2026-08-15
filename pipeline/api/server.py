@@ -40,7 +40,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-06-launcher-v2"
+BUILD_ID = "2026-08-06-cart-v3"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -55,7 +55,7 @@ _PORTAL_PAGES = {
     "readonly-dashboard.html", "readonly-dashboard.js",
     # Sprint 6 — product pricing pages.
     "product-search.html", "product-search.js", "quote-compare.html",
-    "quote-compare.js", "catalog-admin.html", "catalog-admin.js",
+    "quote-compare.js", "checkout.html", "checkout.js", "catalog-admin.html", "catalog-admin.js",
     # Sales workspace redesign pages.
     "opportunities.html", "opportunities.js", "opportunity-board.html",
     "opportunity-board.js", "opportunity-board.css", "material-list-intake.html",

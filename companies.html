@@ -86,6 +86,13 @@
             <option value="supplier">Supplier</option>
             <option value="fulfillment_partner">Fulfillment partner</option>
           </select>
+          <select id="leadTypeFilter">
+            <option value="all">All lead types</option>
+            <option value="verified_contractor">Verified contractors</option>
+            <option value="specifier_architect_engineer">Architects / engineers / specifiers</option>
+            <option value="owner_developer">Owners / developers</option>
+            <option value="unverified_permit_contact">Unverified permit contacts</option>
+          </select>
           <select id="tierFilter">
             <option value="">All priorities</option>
             <option value="Critical">Critical</option>
@@ -104,7 +111,10 @@
             <thead>
               <tr>
                 <th>Company</th>
-                <th>Primary role</th>
+                <th>Lead type</th>
+                <th>Verification</th>
+                <th>Source</th>
+                <th>Why this lead</th>
                 <th>Priority</th>
                 <th>Active</th>
                 <th>Last 30d</th>

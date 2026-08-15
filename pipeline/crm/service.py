@@ -577,6 +577,20 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
     org_id = user["organization_id"]
     where = ["r.organization_id=?"]
     params: list = [org_id]
+    # The outbound-sales queue defaults to verified contractors. Passing
+    # lead_type=all deliberately opens the broader research queues.
+    requested_lead_type = filters.get("lead_type")
+    if requested_lead_type in (None, ""):
+        classified = conn.execute(
+            "SELECT 1 FROM crm_company_relationships WHERE organization_id=? AND lead_type IS NOT NULL LIMIT 1",
+            (org_id,),
+        ).fetchone()
+        lead_type = "verified_contractor" if classified else "all"
+    else:
+        lead_type = str(requested_lead_type).strip()
+    if lead_type != "all":
+        where.append("COALESCE(r.lead_type,c.lead_type,'unverified_permit_contact')=?")
+        params.append(lead_type)
     # Record-level: reps see only their assignments; managers/admins see all org.
     if not has_permission(user, "companies.view"):
         where.append("r.assigned_user_id=?")
@@ -657,6 +671,10 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
                ci.latest_activity_date, ci.municipality_count,
                r.relationship_status, r.assigned_user_id, r.last_contact_at,
                r.next_followup_at, r.do_not_contact, u.display_name AS assigned_to,
+               COALESCE(r.lead_type,c.lead_type,'unverified_permit_contact') AS lead_type,
+               COALESCE(r.lead_verification_status,c.lead_verification_status,'unverified') AS lead_verification_status,
+               COALESCE(r.lead_classification_source,c.lead_source) AS lead_source,
+               COALESCE(r.why_this_lead,c.why_this_lead) AS why_this_lead,
                CASE WHEN {_CONTACT_INFO_SQL} THEN 1 ELSE 0 END AS has_contact_info,
                (SELECT role_type FROM company_roles cr WHERE cr.company_id=c.id
                 ORDER BY is_primary DESC LIMIT 1) AS primary_role
@@ -666,7 +684,10 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
         LEFT JOIN users u ON u.id = r.assigned_user_id
         WHERE {where_sql}
         ORDER BY has_contact_info DESC,
-                 COALESCE(ci.company_priority_score,0) DESC,
+                 COALESCE(ci.projects_last_30_days,0) DESC,
+                 COALESCE(ci.active_projects,0) DESC,
+                 COALESCE(ci.highest_opportunity_score,0) DESC,
+                 COALESCE(ci.estimated_opportunity_total,0) DESC,
                  ci.latest_activity_date DESC
         LIMIT ? OFFSET ?
         """,
@@ -675,7 +696,7 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
     items = []
     for r in rows:
         d = dict(r)
-        d["reason"] = priority_reason(r)
+        d["reason"] = r["why_this_lead"] or priority_reason(r)
         d["recommended_action"] = recommended_action(
             r["relationship_status"], r["next_followup_at"], r["last_contact_at"],
             r["do_not_contact"])

@@ -19,7 +19,8 @@ _COMPANY_FIELDS = (
     "city", "state", "postal_code", "country", "latitude", "longitude",
     "license_number", "license_state", "license_status", "year_established",
     "employee_range", "revenue_range", "first_seen_at", "last_seen_at",
-    "lifecycle_state",
+    "lifecycle_state", "lead_type", "lead_verification_status", "lead_source",
+    "why_this_lead",
 )
 
 # Company intelligence metrics exposed to sales (derived, read-only).
@@ -51,6 +52,8 @@ _PERMIT_FIELDS = (
 _RELATIONSHIP_FIELDS = (
     "id", "organization_id", "company_id", "relationship_status",
     "assigned_user_id", "assigned_by", "assigned_at", "lead_source",
+    "lead_type", "lead_verification_status", "lead_classification_source",
+    "why_this_lead",
     "priority_override", "do_not_contact", "do_not_contact_reason",
     "first_contact_at", "last_contact_at", "next_followup_at", "qualified_at",
     "won_at", "lost_at", "lost_reason", "created_at", "updated_at",

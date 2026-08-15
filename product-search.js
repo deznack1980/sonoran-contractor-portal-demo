@@ -53,7 +53,7 @@
         <td>${fmtQty(it.quantity_available)}</td>
         <td>${fmtLead(it.lead_time_days)}</td>
         <td class="muted">${CIQ.esc(it.warehouse_location || "")}</td>
-        <td><a class="btn btn-sm" href="quote-compare.html?product_id=${it.product_id}&name=${encodeURIComponent(it.product_name || it.sku)}">Compare</a></td>
+        <td><div class="row"><button class="btn btn-sm btn-primary" type="button" data-add-cart data-product="${CIQ.esc(JSON.stringify(it))}">Add</button><a class="btn btn-sm" href="quote-compare.html?product_id=${it.product_id}&name=${encodeURIComponent(it.product_name || it.sku)}">Compare</a></div></td>
       </tr>`).join("");
   }
 
@@ -61,6 +61,13 @@
     user = await CIQ.guard("products.view", { title: "Products", subtitle: "Supplier catalog search", active: "product-search.html" });
     if (!user) return;
     document.getElementById("searchBtn").addEventListener("click", runSearch);
+    document.querySelector("#productsTable tbody").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-add-cart]");
+      if (!button) return;
+      const item = JSON.parse(button.dataset.product);
+      CIQ.cart.add({ productId: item.product_id, supplierId: item.supplier_id, name: item.product_name, sku: item.sku, supplier: item.supplier, unitPrice: item.supplier_price, quantity: 1 });
+      CIQ.toast("Added to cart", "success");
+    });
     document.getElementById("q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") runSearch();
     });

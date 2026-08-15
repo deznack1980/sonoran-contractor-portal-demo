@@ -9,6 +9,19 @@
   CIQ.user = null;
   let authed = false;
 
+  const CART_KEY = "ciq_cart_v1";
+  function readCart() { try { const v = JSON.parse(localStorage.getItem(CART_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function cartKey(item) { return String(item.key || `${item.productId}:${item.supplierId || "any"}`); }
+  function writeCart(items) { localStorage.setItem(CART_KEY, JSON.stringify(items)); document.dispatchEvent(new CustomEvent("ciq:cart-change")); }
+  CIQ.cart = {
+    items: readCart,
+    add(item) { const items = readCart(), key = cartKey(item), old = items.find((i) => cartKey(i) === key), qty = Math.max(1, Number(item.quantity) || 1); if (old) old.quantity = Math.max(1, Number(old.quantity) || 1) + qty; else items.push({ ...item, key, quantity: qty }); writeCart(items); },
+    update(key, qty) { const items = readCart(), item = items.find((i) => cartKey(i) === String(key)); if (item) item.quantity = Math.max(1, Number(qty) || 1); writeCart(items); },
+    remove(key) { writeCart(readCart().filter((i) => cartKey(i) !== String(key))); },
+    clear() { writeCart([]); },
+    total(items = readCart()) { return items.reduce((sum, i) => sum + (Number(i.unitPrice) || 0) * (Number(i.quantity) || 0), 0); },
+  };
+
   /* ---- API ---------------------------------------------------------- */
   async function request(method, path, body) {
     const opts = { method, credentials: "include", headers: { "Content-Type": "application/json" } };
@@ -189,6 +202,10 @@
             <input type="search" id="ciqSearch" placeholder="Search companies…" autocomplete="off" />
           </form>
           <div class="topbar-actions">
+            <div class="cart-wrap" id="ciqCartWrap">
+              <button class="icon-btn" id="ciqCartBtn" type="button" aria-label="Cart" aria-haspopup="dialog" aria-expanded="false">🛒<span class="count" id="ciqCartCount" hidden>0</span></button>
+              <section class="cart-dropdown" id="ciqCartDropdown" role="dialog" aria-label="Shopping cart" hidden><div class="cart-head"><strong>Your cart</strong><button class="icon-btn cart-close" id="ciqCartClose" type="button" aria-label="Close cart">×</button></div><div class="cart-items" id="ciqCartItems"></div><div class="cart-foot"><div class="cart-total"><span>Subtotal</span><strong id="ciqCartSubtotal">$0.00</strong></div><div class="cart-total grand"><span>Total</span><strong id="ciqCartTotal">$0.00</strong></div><a class="btn btn-primary btn-block" id="ciqCheckoutBtn" href="checkout.html">Checkout</a></div></section>
+            </div>
             <button class="icon-btn" id="ciqTasksBtn" title="Tasks" aria-label="Tasks">✓</button>
             <div class="profile" id="ciqProfile" tabindex="0">
               <div class="avatar">${CIQ.esc(initials(CIQ.user.display_name || CIQ.user.email))}</div>
@@ -221,6 +238,19 @@
     const burger = app.querySelector("#ciqBurger");
     burger.addEventListener("click", () => app.classList.toggle("nav-open"));
     app.querySelector("#ciqScrim").addEventListener("click", () => app.classList.remove("nav-open"));
+    const cartWrap = app.querySelector("#ciqCartWrap"), cartButton = app.querySelector("#ciqCartBtn"), cartPanel = app.querySelector("#ciqCartDropdown");
+    const closeCart = () => { cartPanel.hidden = true; cartButton.setAttribute("aria-expanded", "false"); };
+    const money = (v) => "$" + Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const renderCart = () => { const items = CIQ.cart.items(), count = items.reduce((n, i) => n + (Number(i.quantity) || 0), 0), badge = app.querySelector("#ciqCartCount"); badge.textContent = count; badge.hidden = !count; app.querySelector("#ciqCartItems").innerHTML = items.length ? items.map((i) => { const qty = Math.max(1, Number(i.quantity) || 1); return `<article class="cart-item" data-cart-key="${CIQ.esc(cartKey(i))}"><div class="cart-item-copy"><strong>${CIQ.esc(i.name || i.sku || "Product")}</strong><span>${CIQ.esc(i.supplier || "Supplier not selected")}</span><small>${CIQ.esc(i.sku || "")} · ${money(i.unitPrice)} each</small></div><div class="cart-item-actions"><div class="qty-control"><button type="button" data-cart-action="decrease" aria-label="Decrease quantity">−</button><output>${qty}</output><button type="button" data-cart-action="increase" aria-label="Increase quantity">+</button></div><strong>${money((Number(i.unitPrice) || 0) * qty)}</strong><button class="cart-remove" type="button" data-cart-action="remove">Remove</button></div></article>`; }).join("") : `<div class="cart-empty"><strong>Your cart is empty</strong><span>Add a supplier offer to begin checkout.</span></div>`; const total = CIQ.cart.total(items); app.querySelector("#ciqCartSubtotal").textContent = money(total); app.querySelector("#ciqCartTotal").textContent = money(total); const checkout = app.querySelector("#ciqCheckoutBtn"); checkout.classList.toggle("disabled", !items.length); checkout.setAttribute("aria-disabled", String(!items.length)); };
+    const openCart = () => { cartPanel.hidden = false; cartButton.setAttribute("aria-expanded", "true"); renderCart(); };
+    cartButton.addEventListener("click", (e) => { e.stopPropagation(); cartPanel.hidden ? openCart() : closeCart(); });
+    app.querySelector("#ciqCartClose").addEventListener("click", closeCart);
+    cartPanel.addEventListener("click", (e) => { e.stopPropagation(); const control = e.target.closest("[data-cart-action]"); if (!control) return; const row = control.closest("[data-cart-key]"), item = CIQ.cart.items().find((i) => cartKey(i) === row.dataset.cartKey); if (!item) return; if (control.dataset.cartAction === "remove") CIQ.cart.remove(row.dataset.cartKey); else CIQ.cart.update(row.dataset.cartKey, Number(item.quantity) + (control.dataset.cartAction === "increase" ? 1 : -1)); });
+    app.querySelector("#ciqCheckoutBtn").addEventListener("click", (e) => { if (!CIQ.cart.items().length) e.preventDefault(); });
+    document.addEventListener("ciq:cart-change", renderCart);
+    document.addEventListener("click", (e) => { if (!cartWrap.contains(e.target)) closeCart(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCart(); });
+    renderCart();
     const prof = app.querySelector("#ciqProfile"), menu = app.querySelector("#ciqMenu");
     prof.addEventListener("click", (e) => { if (e.target.closest(".menu")) return; menu.classList.toggle("open"); });
     document.addEventListener("click", (e) => { if (!prof.contains(e.target)) menu.classList.remove("open"); });
