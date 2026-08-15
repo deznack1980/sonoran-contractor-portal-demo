@@ -126,6 +126,30 @@ _KNOWLEDGE_V21_COLUMNS = [
     ("material_list_items", "estimate_confidence_pct", "REAL"),
     ("material_list_items", "estimate_rationale", "TEXT"),
     ("material_list_items", "quantity_status", "TEXT NOT NULL DEFAULT 'confirmed'"),
+    # Release 15.3 — verified-company contractor compatibility metrics.
+    ("contractors", "company_id", "INTEGER REFERENCES companies(id)"),
+    ("contractors", "estimated_material_opportunity", "REAL"),
+    ("contractors", "has_contact_info", "INTEGER NOT NULL DEFAULT 0"),
+    ("contractors", "verification_status", "TEXT"),
+    ("contractors", "classification_source", "TEXT"),
+    ("contractors", "classification_rule", "TEXT"),
+    ("contractors", "classification_version", "TEXT"),
+    ("contractors", "contractor_evidence_count", "INTEGER NOT NULL DEFAULT 0"),
+    ("company_intelligence", "contractor_permit_count", "INTEGER"),
+    ("company_intelligence", "contractor_jurisdictions_worked", "TEXT"),
+    ("company_intelligence", "contractor_jurisdiction_breakdown", "TEXT"),
+    ("company_intelligence", "contractor_commercial_pct", "REAL"),
+    ("company_intelligence", "contractor_average_project_value", "REAL"),
+    ("company_intelligence", "contractor_last_permit_date", "TEXT"),
+    ("company_intelligence", "contractor_estimated_annual_volume", "REAL"),
+    ("company_intelligence", "contractor_estimated_material_opportunity", "REAL"),
+    ("company_intelligence", "contractor_opportunity_rating", "REAL"),
+    ("company_intelligence", "contractor_has_contact_info", "INTEGER"),
+    ("company_intelligence", "contractor_verification_status", "TEXT"),
+    ("company_intelligence", "contractor_classification_source", "TEXT"),
+    ("company_intelligence", "contractor_classification_rule", "TEXT"),
+    ("company_intelligence", "contractor_classification_version", "TEXT"),
+    ("company_intelligence", "contractor_metrics_calculated_at", "TEXT"),
 ]
 
 
@@ -141,6 +165,8 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
         if column in cols:
             continue
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contractors'").fetchone():
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_contractors_company ON contractors(company_id)")
     conn.commit()
 
 

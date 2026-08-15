@@ -13,8 +13,6 @@ from pipeline.config.settings import (
     REPORT_MIN_OPPORTUNITY_SCORE,
     REPORTS_GENERATED_DIR,
 )
-from pipeline.reports.excel_export import write_ranked_permits_excel
-from pipeline.reports.pdf_export import write_permit_intelligence_pdf
 from pipeline.reports.report_presentation import (
     daily_summary_block,
     format_permit_card,
@@ -454,6 +452,11 @@ def highest_opportunity_projects_report(conn: sqlite3.Connection) -> str:
 
 def generate_excel_and_pdf_reports(conn: sqlite3.Connection) -> list[str]:
     """Formatted Excel + PDF for the full threshold-qualified ranked list."""
+    # Keep spreadsheet/PDF dependencies optional for installations that only
+    # run the core CRM, contractor rebuild, or Markdown reports.
+    from pipeline.reports.excel_export import write_ranked_permits_excel
+    from pipeline.reports.pdf_export import write_permit_intelligence_pdf
+
     rows = _fetch_ranked_permits(conn)
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     excel_path = write_ranked_permits_excel(

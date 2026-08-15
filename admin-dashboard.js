@@ -132,7 +132,7 @@
       <span>${CIQ.esc(label)}</span><strong>${Number(number || 0).toLocaleString()}</strong>
       <small class="source-tag ${sourceClass}">${CIQ.esc(sourceLabel)}</small></div>`;
     document.getElementById("verificationPanel").innerHTML = `<div class="verification-head">
-      <div><span class="live-proof"><i></i> LIVE TEST PROOF</span><h3>Release 15.2 Project Material Estimates: ACTIVE</h3>
+      <div><span class="live-proof"><i></i> LIVE TEST PROOF</span><h3>Release 15.3 Verified Contractor Foundation: ACTIVE</h3>
         <p>This panel is rendered by the running server and counted from its connected database—not from a spreadsheet or static mockup.</p></div>
       <div class="verification-build"><span>RUNNING BUILD</span><strong>${CIQ.esc(v.build_id || "Build unavailable")}</strong>
         <small>Database: ${CIQ.esc(v.database_status || "unknown")} · ${CIQ.esc(latest)}</small></div>
@@ -144,6 +144,7 @@
       ${metric("Companies researched", v.external_evidence_companies, "source-external", `${Number(v.external_evidence_sources || 0)} source types`)}
       ${metric("Live ADOT bids", v.live_public_bids, "source-external", `${Number(v.public_bid_planholders || 0)} planholders · ${Number(v.matched_public_planholders || 0)} matched`)}
       ${metric("Project material estimates", v.project_material_estimates, "source-derived", `${Number(v.estimated_material_categories || 0)} suggested categories`)}
+      ${metric("Verified contractor directory", v.verified_contractor_directory, "source-derived", `${Number(v.noncanonical_contractor_directory || 0)} noncanonical · ${Number(v.verified_projects_unlinked || 0)} projects unlinked`)}
       ${metric("CRM activities", v.crm_activity_records, "source-crm", "Entered in CRM")}
       ${metric("CRM relationships", v.crm_relationship_records, "source-crm", "Entered in CRM")}
       ${metric("Jurisdictions", v.jurisdiction_sources, "source-public", "Municipal source")}

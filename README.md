@@ -149,9 +149,15 @@ on Windows.)
 - **Contractor matching across jurisdictions:** `contractors.html` / `contractors.js`, reading
   `data/exports/contractor_matching.json` — surfaces contractors pulling permits in more than one
   connected jurisdiction (a contractor expanding into a new market is a live buying signal there).
-  Matched by normalized contractor name across jurisdictions (license number is recorded but not
-  used as part of the match key, since it's inconsistently available per source — see the
-  docstring in `pipeline/contractors/rebuild.py` for why).
+  Release 15.3 builds this compatibility export from canonical `companies.id` records classified
+  as active, verified contractors. Raw permit names never create directory records independently.
+  Name variants consolidate through their canonical company assignment, and every exported row
+  includes verification provenance.
+- **Read-only contractor audit:** `python -m pipeline.contractors.audit` prints the current
+  contractor/assignment integrity snapshot without migrating or writing to the database. Use
+  `--output before.json --markdown before.md` before an approved rebuild, then rerun with
+  `--before before.json` afterward. A timestamped database backup and review of the before snapshot
+  are mandatory before manually rebuilding the production compatibility table.
 - **Jurisdiction connection status (source of truth):** `pipeline/config/jurisdictions.yaml`
 - **Scoring/materials-estimation methodology:** `pipeline/analysis/constants.py` (all weights,
   fractions, and margins are documented heuristic assumptions — see the module docstrings)

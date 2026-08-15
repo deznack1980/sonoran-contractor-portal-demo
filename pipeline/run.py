@@ -60,6 +60,7 @@ def cmd_companies(conn):
     from pipeline.company_resolution.metrics import compute_company_metrics
     from pipeline.company_resolution.lead_role_correction import apply_lead_role_correction
     from pipeline.company_resolution.timeline import rebuild_company_timeline
+    from pipeline.contractors.rebuild import rebuild_contractors
 
     print("=== Company identity backfill ===")
     stats = backfill_companies(conn, resume=True)
@@ -70,6 +71,9 @@ def cmd_companies(conn):
     print("=== Company metrics ===")
     n = compute_company_metrics(conn)
     print(f"  metrics for {n} companies")
+    print("=== Verified contractor compatibility rebuild ===")
+    contractor_count = rebuild_contractors(conn)
+    print(f"  {contractor_count} verified contractor profiles")
     print("=== Company timeline ===")
     t = rebuild_company_timeline(conn)
     print(f"  {t} new timeline rows")
@@ -170,7 +174,6 @@ def main():
             for step_fn in (
                 cmd_ingest,
                 cmd_analyze,
-                cmd_rebuild_contractors,
                 cmd_companies,
                 cmd_export,
                 cmd_reports,
