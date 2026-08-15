@@ -885,6 +885,26 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     org_id = user["organization_id"]
     where = ["r.organization_id=?"]
     params: list = [org_id]
+
+    # Sales execution is contractor-first. Broader lead types remain available
+    # as explicit research queues, but they never leak into the default view.
+    classified = conn.execute(
+        "SELECT 1 FROM crm_company_relationships "
+        "WHERE organization_id=? AND lead_type IS NOT NULL LIMIT 1",
+        (org_id,),
+    ).fetchone() is not None
+    requested_lead_type = (filters.get("lead_type") or "").strip()
+    lead_type = requested_lead_type or ("verified_contractor" if classified else "all")
+    allowed_lead_types = {
+        "all", "verified_contractor", "specifier_architect_engineer",
+        "owner_developer", "unverified_permit_contact",
+    }
+    if lead_type not in allowed_lead_types:
+        raise ValidationError("invalid lead_type")
+    if lead_type != "all":
+        where.append("COALESCE(r.lead_type,c.lead_type,'unverified_permit_contact')=?")
+        params.append(lead_type)
+
     if not has_permission(user, "companies.view"):
         where.append("r.assigned_user_id=?")
         params.append(user["id"])
@@ -932,6 +952,10 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     rows = conn.execute(
         f"""
         SELECT pr.id AS project_id, r.company_id, c.display_name,
+               COALESCE(r.lead_type,c.lead_type,'unverified_permit_contact') AS lead_type,
+               COALESCE(r.lead_verification_status,c.lead_verification_status,'unverified') AS lead_verification_status,
+               COALESCE(r.lead_classification_source,c.lead_source) AS lead_source,
+               COALESCE(r.why_this_lead,c.why_this_lead) AS why_this_lead,
                p.permit_number, p.jurisdiction, p.job_address, p.city, p.state,
                p.description, p.issued_date, p.first_seen_at, p.last_updated_at,
                pr.project_category, pr.project_lifecycle,
@@ -952,7 +976,8 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
         """,
         [*params, page_size, (page - 1) * page_size]).fetchall()
     return {"items": [dict(r) for r in rows], "total": total, "page": page,
-            "page_size": page_size, "pages": (total + page_size - 1) // page_size if page_size else 1}
+            "page_size": page_size, "pages": (total + page_size - 1) // page_size if page_size else 1,
+            "active_lead_type": lead_type, "classification_ready": classified}
 
 
 def my_activity(conn: sqlite3.Connection, user: dict, filters: dict | None = None) -> dict:

@@ -298,6 +298,83 @@ def test_opportunities_score_filter(env):
     assert res["total"] == 1 and res["items"][0]["opportunity_score"] == 90
 
 
+def test_opportunities_default_to_verified_contractors_and_separate_research(env):
+    c = env["conn"]
+    _project(c, env["co1"], score=90)
+    _project(c, env["co2"], score=95)
+    c.execute(
+        "UPDATE companies SET lead_type='verified_contractor', "
+        "lead_verification_status='verified', lead_source='contractor_name', "
+        "why_this_lead='Explicit contractor field' WHERE id=?",
+        (env["co1"],),
+    )
+    c.execute(
+        "UPDATE companies SET lead_type='specifier_architect_engineer', "
+        "lead_verification_status='role_inferred', lead_source='PROFESS_NAME', "
+        "why_this_lead='Phoenix permit professional' WHERE id=?",
+        (env["co2"],),
+    )
+    c.execute(
+        "UPDATE crm_company_relationships SET lead_type='verified_contractor', "
+        "lead_verification_status='verified', lead_classification_source='contractor_name', "
+        "why_this_lead='Explicit contractor field' WHERE company_id=?",
+        (env["co1"],),
+    )
+    c.execute(
+        "UPDATE crm_company_relationships SET lead_type='specifier_architect_engineer', "
+        "lead_verification_status='role_inferred', lead_classification_source='PROFESS_NAME', "
+        "why_this_lead='Phoenix permit professional' WHERE company_id=?",
+        (env["co2"],),
+    )
+    c.commit()
+
+    default_queue = crm.opportunities(c, env["mgr"])
+    assert default_queue["classification_ready"] is True
+    assert default_queue["active_lead_type"] == "verified_contractor"
+    assert [item["company_id"] for item in default_queue["items"]] == [env["co1"]]
+    assert default_queue["items"][0]["lead_source"] == "contractor_name"
+
+    specifier_queue = crm.opportunities(
+        c, env["mgr"], {"lead_type": "specifier_architect_engineer"}
+    )
+    assert [item["company_id"] for item in specifier_queue["items"]] == [env["co2"]]
+    assert specifier_queue["items"][0]["why_this_lead"] == "Phoenix permit professional"
+
+    all_queues = crm.opportunities(c, env["mgr"], {"lead_type": "all"})
+    assert all_queues["total"] == 2
+
+
+def test_project_records_ui_exposes_lead_integrity_queues():
+    html = (PROJECT_ROOT / "opportunities.html").read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "opportunities.js").read_text(encoding="utf-8")
+    assert 'id="flead"' in html
+    for lead_type in (
+        "verified_contractor",
+        "specifier_architect_engineer",
+        "owner_developer",
+        "unverified_permit_contact",
+    ):
+        assert lead_type in html
+    assert 'lead_type: "verified_contractor"' in script
+    assert "classification_ready" in script
+    assert "ApplyCorridorIQLeadIntegrity.bat" in script
+
+
+def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
+    rollout = (PROJECT_ROOT / "scripts" / "apply_lead_integrity.py").read_text(encoding="utf-8")
+    one_click = (PROJECT_ROOT / "ApplyCorridorIQLeadIntegrity.bat").read_text(encoding="utf-8")
+    launcher = (PROJECT_ROOT / "CorridorIQHQ.bat").read_text(encoding="utf-8")
+    server = (PROJECT_ROOT / "pipeline" / "api" / "server.py").read_text(encoding="utf-8")
+
+    assert "conn.backup(target)" in rollout
+    assert "PRAGMA quick_check" in rollout
+    assert "nonverified_project_links" in rollout
+    assert "replace_permit_events=True" in rollout
+    assert "apply_lead_integrity.py\" --apply" in one_click
+    assert "2026-08-15-lead-integrity-r11" in launcher
+    assert 'BUILD_ID = "2026-08-15-lead-integrity-r11"' in server
+
+
 # --------------------------------------------------------------------------
 # Personal activity feed
 # --------------------------------------------------------------------------
