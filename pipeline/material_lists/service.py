@@ -7,7 +7,7 @@ company access and organization boundary before returning or mutating data.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pipeline.auth.rbac import can_access_company, require_permission
 from pipeline.auth.service import write_audit
@@ -15,6 +15,15 @@ from pipeline.crm.service import ValidationError
 
 
 STATUSES = {"draft", "ready_for_review", "pricing_requested", "needs_catalog_review", "priced"}
+RFQ_STATUSES = {"prepared", "sent", "responded", "declined", "awarded", "cancelled"}
+RFQ_TRANSITIONS = {
+    "prepared": {"sent", "cancelled"},
+    "sent": {"responded", "declined", "cancelled"},
+    "responded": {"awarded", "cancelled"},
+    "declined": {"prepared"},
+    "cancelled": {"prepared"},
+    "awarded": set(),
+}
 
 
 def _now() -> str:
@@ -30,7 +39,8 @@ def _serialize(conn: sqlite3.Connection, list_id: int) -> dict:
     row = conn.execute(
         """
         SELECT ml.*, c.display_name AS company_name,
-               p.job_address AS project_name, p.permit_number
+               COALESCE(NULLIF(TRIM(ml.project_name_snapshot),''), p.job_address) AS project_name,
+               p.permit_number
         FROM material_lists ml
         JOIN companies c ON c.id=ml.company_id
         LEFT JOIN projects pr ON pr.id=ml.project_id
@@ -49,7 +59,8 @@ def _serialize(conn: sqlite3.Connection, list_id: int) -> dict:
                    requested_description AS description, manufacturer,
                    sku_snapshot AS sku, supplier_price_snapshot AS supplier_price,
                    quantity_available_snapshot AS quantity_available,
-                   lead_time_days_snapshot AS lead_time_days, match_status
+                   lead_time_days_snapshot AS lead_time_days,
+                   allow_substitution, match_status
             FROM material_list_items
             WHERE material_list_id=?
             ORDER BY line_number, id
@@ -81,6 +92,17 @@ def latest(conn: sqlite3.Connection, user: dict, params: dict) -> dict:
         values.append(int(project_id))
     row = conn.execute(sql, values).fetchone()
     return {"item": _serialize(conn, row["id"]) if row else None}
+
+
+def _list_for_access(conn: sqlite3.Connection, user: dict, list_id: int) -> dict:
+    row = conn.execute(
+        "SELECT organization_id, company_id FROM material_lists WHERE id=?",
+        (int(list_id),),
+    ).fetchone()
+    if row is None or row["organization_id"] != user["organization_id"]:
+        raise ValidationError("material list not found")
+    _require_company_access(conn, user, row["company_id"])
+    return _serialize(conn, int(list_id))
 
 
 def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) -> dict:
@@ -124,13 +146,17 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
         conn.execute(
             """
             UPDATE material_lists
-            SET project_id=?, needed_by=?, delivery_preference=?, notes=?,
-                source_name=?, status=?, updated_at=?
+            SET project_id=?, project_name_snapshot=?, needed_by=?,
+                quote_needed_by=?, jobsite_postal_code=?,
+                delivery_preference=?, notes=?, source_name=?, status=?, updated_at=?
             WHERE id=?
             """,
             (
-                project_id, data.get("neededBy"), data.get("deliveryPreference"),
-                data.get("requestNotes"), data.get("sourceName"), status, now, list_id,
+                project_id, str(data.get("projectName") or "").strip() or None,
+                data.get("neededBy"), data.get("quoteNeededBy"),
+                str(data.get("jobsitePostalCode") or "").strip() or None,
+                data.get("deliveryPreference"), data.get("requestNotes"),
+                data.get("sourceName"), status, now, list_id,
             ),
         )
         conn.execute("DELETE FROM material_list_items WHERE material_list_id=?", (list_id,))
@@ -140,14 +166,17 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
             """
             INSERT INTO material_lists (
                 organization_id, company_id, project_id, created_by_user_id,
-                needed_by, delivery_preference, notes, source_name, status,
-                created_at, updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                project_name_snapshot, needed_by, quote_needed_by, jobsite_postal_code,
+                delivery_preference, notes, source_name, status, created_at, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 user["organization_id"], company_id, project_id, user["id"],
-                data.get("neededBy"), data.get("deliveryPreference"),
-                data.get("requestNotes"), data.get("sourceName"), status, now, now,
+                str(data.get("projectName") or "").strip() or None,
+                data.get("neededBy"), data.get("quoteNeededBy"),
+                str(data.get("jobsitePostalCode") or "").strip() or None,
+                data.get("deliveryPreference"), data.get("requestNotes"),
+                data.get("sourceName"), status, now, now,
             ),
         )
         list_id = cursor.lastrowid
@@ -169,8 +198,9 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
                 material_list_id, line_number, product_id, quantity, unit,
                 requested_description, manufacturer, sku_snapshot,
                 supplier_price_snapshot, quantity_available_snapshot,
-                lead_time_days_snapshot, match_status, created_at, updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                lead_time_days_snapshot, allow_substitution, match_status,
+                created_at, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 list_id, line_number, product_id, quantity,
@@ -183,6 +213,7 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
                 else raw.get("quantity_available"),
                 raw.get("leadTimeDays") if raw.get("leadTimeDays") is not None
                 else raw.get("lead_time_days"),
+                1 if raw.get("allowSubstitution", raw.get("allow_substitution", True)) else 0,
                 match_status, now, now,
             ),
         )
@@ -197,3 +228,246 @@ def save(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, ua=None) 
                  "status": status, "line_count": line_number},
     )
     return {"item": _serialize(conn, list_id)}
+
+
+def quote_supplier_options(conn: sqlite3.Connection, user: dict) -> dict:
+    """Business-safe supplier choices for the manual RFQ composer."""
+    require_permission(user, "products.quote")
+    rows = conn.execute(
+        """
+        SELECT id, name, code, quote_contact_name, quote_email, quote_phone,
+               city, state
+        FROM suppliers
+        WHERE active=1 AND code IS NOT NULL
+        ORDER BY CASE WHEN quote_email IS NOT NULL AND TRIM(quote_email)<>'' THEN 0 ELSE 1 END,
+                 name
+        """
+    ).fetchall()
+    return {"items": [dict(row) for row in rows]}
+
+
+def _quote_request(conn: sqlite3.Connection, request_id: int) -> dict:
+    row = conn.execute(
+        """
+        SELECT r.*, s.name AS supplier_name, s.code AS supplier_code,
+               ml.company_id, c.display_name AS company_name
+        FROM supplier_quote_requests r
+        JOIN suppliers s ON s.id=r.supplier_id
+        JOIN material_lists ml ON ml.id=r.material_list_id
+        JOIN companies c ON c.id=ml.company_id
+        WHERE r.id=?
+        """,
+        (int(request_id),),
+    ).fetchone()
+    if row is None:
+        raise ValidationError("quote request not found")
+    return dict(row)
+
+
+def list_quote_requests(conn: sqlite3.Connection, user: dict, list_id: int) -> dict:
+    require_permission(user, "products.quote")
+    _list_for_access(conn, user, list_id)
+    rows = conn.execute(
+        "SELECT id FROM supplier_quote_requests WHERE organization_id=? "
+        "AND material_list_id=? ORDER BY updated_at DESC, id DESC",
+        (user["organization_id"], int(list_id)),
+    ).fetchall()
+    return {"items": [_quote_request(conn, row["id"]) for row in rows]}
+
+
+def _rfq_copy(material_list: dict, supplier: sqlite3.Row, user: dict,
+              quote_needed_by: str | None, postal_code: str | None) -> tuple[str, str]:
+    project = material_list.get("project_name") or material_list.get("permit_number") or "Project"
+    company = material_list.get("company_name") or "Contractor"
+    subject = f"RFQ — {project} — {company}"[:240]
+    greeting = supplier["quote_contact_name"] or f"{supplier['name']} quote team"
+    requested_by = user.get("display_name") or user.get("email") or "CorridorIQ"
+    lines = [
+        f"Hello {greeting},",
+        "",
+        f"Please quote the following materials for {company}.",
+        f"Project / job: {project}",
+        f"Jobsite ZIP: {postal_code or 'Not provided'}",
+        f"Delivery preference: {material_list.get('delivery_preference') or 'Best available option'}",
+        f"Materials needed by: {material_list.get('needed_by') or 'Please advise'}",
+        f"Quote due by: {quote_needed_by or 'As soon as possible'}",
+        "",
+        "Materials:",
+    ]
+    for item in material_list.get("rows") or []:
+        details = [
+            f"{item.get('line_number')}. {item.get('quantity'):g} {item.get('unit') or 'each'} — "
+            f"{item.get('description')}",
+        ]
+        if item.get("manufacturer"):
+            details.append(f"Manufacturer: {item['manufacturer']}")
+        if item.get("sku"):
+            details.append(f"SKU: {item['sku']}")
+        details.append("Alternates allowed" if item.get("allow_substitution") else "Exact item only")
+        lines.append(" | ".join(details))
+    notes = str(material_list.get("notes") or "").strip()
+    if notes:
+        lines.extend(["", f"Project notes: {notes[:2000]}"])
+    lines.extend([
+        "",
+        "Please include unit pricing, availability, lead time, delivery cost, quote validity, and applicable terms.",
+        "",
+        "Thank you,",
+        requested_by,
+        "CorridorIQ",
+    ])
+    return subject, "\n".join(lines)
+
+
+def prepare_quote_request(conn: sqlite3.Connection, user: dict, list_id: int,
+                          data: dict, *, ip=None, ua=None) -> dict:
+    require_permission(user, "products.quote")
+    material_list = _list_for_access(conn, user, list_id)
+    if not material_list.get("rows"):
+        raise ValidationError("add at least one material item before preparing a quote request")
+    try:
+        supplier_id = int(data.get("supplier_id"))
+    except (TypeError, ValueError):
+        raise ValidationError("supplier_id is required")
+    supplier = conn.execute(
+        "SELECT * FROM suppliers WHERE id=? AND active=1", (supplier_id,)
+    ).fetchone()
+    if supplier is None:
+        raise ValidationError("active supplier not found")
+
+    quote_needed_by = str(data.get("quote_needed_by") or material_list.get("quote_needed_by") or "").strip() or None
+    postal_code = str(data.get("jobsite_postal_code") or material_list.get("jobsite_postal_code") or "").strip() or None
+    if not postal_code:
+        raise ValidationError("jobsite ZIP is required before preparing an RFQ")
+    subject, message = _rfq_copy(material_list, supplier, user, quote_needed_by, postal_code)
+    now = _now()
+    follow_up_at = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(timespec="seconds")
+    existing = conn.execute(
+        "SELECT * FROM supplier_quote_requests WHERE material_list_id=? AND supplier_id=?",
+        (int(list_id), supplier_id),
+    ).fetchone()
+    if existing and existing["status"] in {"sent", "responded", "awarded"}:
+        return {"item": _quote_request(conn, existing["id"]), "reused": True}
+
+    values = (
+        user["organization_id"], int(list_id), supplier_id, user["id"],
+        supplier["quote_contact_name"], supplier["quote_email"], subject, message,
+        quote_needed_by, postal_code, follow_up_at, now, now,
+    )
+    if existing:
+        conn.execute(
+            """
+            UPDATE supplier_quote_requests
+            SET requested_by_user_id=?, status='prepared', recipient_name=?, recipient_email=?,
+                subject=?, message=?, quote_needed_by=?, jobsite_postal_code=?,
+                follow_up_at=?, sent_at=NULL, responded_at=NULL, quoted_total=NULL,
+                estimated_delivery_days=NULL, valid_until=NULL, response_notes=NULL,
+                updated_at=?
+            WHERE id=? AND organization_id=?
+            """,
+            (
+                user["id"], supplier["quote_contact_name"], supplier["quote_email"],
+                subject, message, quote_needed_by, postal_code, follow_up_at,
+                now, existing["id"], user["organization_id"],
+            ),
+        )
+        request_id = existing["id"]
+    else:
+        cursor = conn.execute(
+            """
+            INSERT INTO supplier_quote_requests (
+                organization_id, material_list_id, supplier_id, requested_by_user_id,
+                status, recipient_name, recipient_email, subject, message,
+                quote_needed_by, jobsite_postal_code, follow_up_at, created_at, updated_at
+            ) VALUES (?,?,?,?,'prepared',?,?,?,?,?,?,?,?,?)
+            """,
+            values,
+        )
+        request_id = cursor.lastrowid
+    conn.execute(
+        "UPDATE material_lists SET status='pricing_requested', quote_needed_by=?, "
+        "jobsite_postal_code=?, updated_at=? WHERE id=?",
+        (quote_needed_by, postal_code, now, int(list_id)),
+    )
+    conn.commit()
+    write_audit(
+        conn, event_type="supplier_quote_request_prepared", success=True,
+        user_id=user["id"], organization_id=user["organization_id"],
+        resource_type="supplier_quote_request", resource_id=request_id,
+        action="prepare", ip_address=ip, user_agent=ua,
+        details={"material_list_id": int(list_id), "supplier_id": supplier_id},
+    )
+    return {"item": _quote_request(conn, request_id), "reused": False}
+
+
+def update_quote_request(conn: sqlite3.Connection, user: dict, request_id: int,
+                         data: dict, *, ip=None, ua=None) -> dict:
+    require_permission(user, "products.quote")
+    current = _quote_request(conn, request_id)
+    if current["organization_id"] != user["organization_id"]:
+        raise ValidationError("quote request not found")
+    _list_for_access(conn, user, current["material_list_id"])
+    new_status = str(data.get("status") or "").strip().lower()
+    if new_status not in RFQ_STATUSES:
+        raise ValidationError("invalid quote request status")
+    if new_status != current["status"] and new_status not in RFQ_TRANSITIONS[current["status"]]:
+        raise ValidationError(f"cannot move quote request from {current['status']} to {new_status}")
+    if new_status == "sent" and not str(current.get("recipient_email") or "").strip():
+        raise ValidationError("add a supplier quote email before marking the RFQ sent")
+
+    quoted_total = current.get("quoted_total")
+    delivery_days = current.get("estimated_delivery_days")
+    valid_until = current.get("valid_until")
+    response_notes = current.get("response_notes")
+    if new_status in {"responded", "awarded"}:
+        raw_total = data.get("quoted_total", quoted_total)
+        try:
+            quoted_total = float(raw_total)
+        except (TypeError, ValueError):
+            raise ValidationError("quoted total is required when recording a response")
+        if quoted_total < 0:
+            raise ValidationError("quoted total cannot be negative")
+        raw_days = data.get("estimated_delivery_days", delivery_days)
+        delivery_days = int(raw_days) if raw_days not in (None, "") else None
+        if delivery_days is not None and delivery_days < 0:
+            raise ValidationError("delivery days cannot be negative")
+        valid_until = str(data.get("valid_until") or valid_until or "").strip() or None
+        response_notes = str(data.get("response_notes") or response_notes or "").strip()[:4000] or None
+
+    now = _now()
+    sent_at = current.get("sent_at") or (now if new_status == "sent" else None)
+    responded_at = current.get("responded_at") or (now if new_status == "responded" else None)
+    conn.execute(
+        """
+        UPDATE supplier_quote_requests
+        SET status=?, sent_at=?, responded_at=?, quoted_total=?,
+            estimated_delivery_days=?, valid_until=?, response_notes=?, updated_at=?
+        WHERE id=? AND organization_id=?
+        """,
+        (
+            new_status, sent_at, responded_at, quoted_total, delivery_days,
+            valid_until, response_notes, now, int(request_id), user["organization_id"],
+        ),
+    )
+    if new_status in {"responded", "awarded"}:
+        conn.execute(
+            "UPDATE material_lists SET status='priced', updated_at=? WHERE id=?",
+            (now, current["material_list_id"]),
+        )
+    if new_status == "awarded":
+        conn.execute(
+            "UPDATE supplier_quote_requests SET status='cancelled', updated_at=? "
+            "WHERE material_list_id=? AND id<>? "
+            "AND status IN ('prepared','sent','responded')",
+            (now, current["material_list_id"], int(request_id)),
+        )
+    conn.commit()
+    write_audit(
+        conn, event_type="supplier_quote_request_updated", success=True,
+        user_id=user["id"], organization_id=user["organization_id"],
+        resource_type="supplier_quote_request", resource_id=int(request_id),
+        action=new_status, ip_address=ip, user_agent=ua,
+        details={"material_list_id": current["material_list_id"],
+                 "supplier_id": current["supplier_id"]},
+    )
+    return {"item": _quote_request(conn, int(request_id))}

@@ -10,7 +10,10 @@
     const user = await CIQ.guard("products.view", { title: "Checkout", active: "product-search.html" });
     if (!user) return;
     document.addEventListener("ciq:cart-change", render);
-    document.getElementById("placeOrderBtn").addEventListener("click", () => { CIQ.cart.clear(); CIQ.toast("Checkout submitted", "success"); render(); });
+    document.getElementById("placeOrderBtn").addEventListener("click", () => {
+      if (!CIQ.cart.items().length) return;
+      location.href = "material-list-intake.html?from_cart=1";
+    });
     render();
   });
 })();

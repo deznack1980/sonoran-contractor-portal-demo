@@ -34,6 +34,19 @@ def _can_see_cost(user: dict) -> bool:
     return has_permission(user, "supplier_pricing.view")
 
 
+def _contact_fields(data: dict) -> tuple[str | None, str | None, str | None]:
+    name = str(data.get("quote_contact_name") or "").strip() or None
+    email = str(data.get("quote_email") or "").strip().lower() or None
+    phone = str(data.get("quote_phone") or "").strip() or None
+    if email and ("@" not in email or " " in email or len(email) > 254):
+        raise ValidationError("quote email is not valid")
+    if name and len(name) > 160:
+        raise ValidationError("quote contact name is too long")
+    if phone and len(phone) > 60:
+        raise ValidationError("quote phone is too long")
+    return name, email, phone
+
+
 # --------------------------------------------------------------------------
 # Sales-facing
 # --------------------------------------------------------------------------
@@ -69,7 +82,8 @@ def list_suppliers(conn: sqlite3.Connection, user: dict) -> list[dict]:
     require_permission(user, "products.view")
     rows = conn.execute(
         "SELECT id, name, code, city, state, warehouse_address, latitude, longitude, "
-        "active FROM suppliers WHERE code IS NOT NULL ORDER BY name").fetchall()
+        "active, quote_contact_name, quote_email, quote_phone "
+        "FROM suppliers WHERE code IS NOT NULL ORDER BY name").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -86,11 +100,44 @@ def add_supplier(conn: sqlite3.Connection, user: dict, data: dict, *, ip=None, u
         city=data.get("city"), state=data.get("state"),
         postal_code=data.get("postal_code"),
         latitude=data.get("latitude"), longitude=data.get("longitude"))
+    contact_name, quote_email, quote_phone = _contact_fields(data)
+    conn.execute(
+        "UPDATE suppliers SET quote_contact_name=?, quote_email=?, quote_phone=? WHERE id=?",
+        (contact_name, quote_email, quote_phone, sid),
+    )
+    conn.commit()
     write_audit(conn, event_type="admin_change", success=True, user_id=user["id"],
                 organization_id=user.get("organization_id"), resource_type="supplier",
                 resource_id=sid, action="add_supplier", ip_address=ip, user_agent=ua)
     row = conn.execute("SELECT * FROM suppliers WHERE id=?", (sid,)).fetchone()
     return dict(row)
+
+
+def update_supplier(conn: sqlite3.Connection, user: dict, supplier_id: int,
+                    data: dict, *, ip=None, ua=None) -> dict:
+    """Update the named RFQ contact for an existing supplier.
+
+    Supplier commercial contacts are admin-maintained.  Quote requests snapshot
+    these values so historical requests are not rewritten by later edits.
+    """
+    require_permission(user, "supplier_pricing.manage")
+    row = conn.execute("SELECT id FROM suppliers WHERE id=?", (int(supplier_id),)).fetchone()
+    if row is None:
+        raise ValidationError("supplier not found")
+    contact_name, quote_email, quote_phone = _contact_fields(data)
+    conn.execute(
+        "UPDATE suppliers SET quote_contact_name=?, quote_email=?, quote_phone=?, "
+        "updated_at=? WHERE id=?",
+        (contact_name, quote_email, quote_phone, _now(), int(supplier_id)),
+    )
+    conn.commit()
+    write_audit(
+        conn, event_type="admin_change", success=True, user_id=user["id"],
+        organization_id=user.get("organization_id"), resource_type="supplier",
+        resource_id=int(supplier_id), action="update_quote_contact",
+        ip_address=ip, user_agent=ua,
+    )
+    return dict(conn.execute("SELECT * FROM suppliers WHERE id=?", (int(supplier_id),)).fetchone())
 
 
 def _decode_upload(data: dict):

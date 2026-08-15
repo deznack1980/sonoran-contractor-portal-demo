@@ -114,6 +114,14 @@ _KNOWLEDGE_V21_COLUMNS = [
     ("suppliers", "longitude", "REAL"),
     ("suppliers", "active", "INTEGER NOT NULL DEFAULT 1"),
     ("suppliers", "updated_at", "TEXT"),
+    ("suppliers", "quote_contact_name", "TEXT"),
+    ("suppliers", "quote_email", "TEXT"),
+    ("suppliers", "quote_phone", "TEXT"),
+    # Revenue workflow — standardized material RFQ inputs.
+    ("material_lists", "quote_needed_by", "TEXT"),
+    ("material_lists", "jobsite_postal_code", "TEXT"),
+    ("material_lists", "project_name_snapshot", "TEXT"),
+    ("material_list_items", "allow_substitution", "INTEGER NOT NULL DEFAULT 1"),
 ]
 
 
@@ -200,3 +208,4 @@ if __name__ == "__main__":
     print(f"Database initialized at {DB_PATH}")
     print(f"Seeded {count} jurisdictions.")
     connection.close()
+

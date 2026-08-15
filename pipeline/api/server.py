@@ -40,7 +40,7 @@ from pipeline.db.database import get_connection, init_db
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-06-cart-v3"
+BUILD_ID = "2026-08-15-rfq-cart-v1"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -71,6 +71,9 @@ _SALES_COMPANY_RE = re.compile(
     rf"^/api/sales/companies/{_ID}(?:/(projects|permits|activities|relationship))?$")
 _SALES_TASK_RE = re.compile(rf"^/api/sales/tasks/{_ID}$")
 _ADMIN_USER_RE = re.compile(rf"^/api/admin/users/{_ID}$")
+_ADMIN_SUPPLIER_RE = re.compile(rf"^/api/admin/suppliers/{_ID}$")
+_MATERIAL_LIST_RFQ_RE = re.compile(rf"^/api/material-lists/{_ID}/quote-requests$")
+_MATERIAL_RFQ_RE = re.compile(rf"^/api/material-quote-requests/{_ID}$")
 
 
 def _factory():
@@ -318,6 +321,12 @@ class ApiHandler(BaseHTTPRequestHandler):
         # --- material lists ---
         if path == "/api/material-lists/latest":
             return self._json(200, material_lists.latest(conn, user, query))
+        if path == "/api/suppliers/quote-options":
+            return self._json(200, material_lists.quote_supplier_options(conn, user))
+        m = _MATERIAL_LIST_RFQ_RE.match(path)
+        if m:
+            return self._json(200, material_lists.list_quote_requests(
+                conn, user, int(m.group(1))))
 
         # --- reports ---
         if path == "/api/reports/catalog":
@@ -399,6 +408,14 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         if method == "POST" and path == "/api/material-lists":
             return self._json(200, material_lists.save(conn, user, body, ip=ip, ua=ua))
+        m = _MATERIAL_LIST_RFQ_RE.match(path)
+        if m and method == "POST":
+            return self._json(201, material_lists.prepare_quote_request(
+                conn, user, int(m.group(1)), body, ip=ip, ua=ua))
+        m = _MATERIAL_RFQ_RE.match(path)
+        if m and method == "PATCH":
+            return self._json(200, material_lists.update_quote_request(
+                conn, user, int(m.group(1)), body, ip=ip, ua=ua))
 
         # --- manager ---
         if method == "POST" and path == "/api/manager/assignments":
@@ -434,6 +451,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 body.get("jobsite") or {}, ip=ip, ua=ua))
         if method == "POST" and path == "/api/admin/suppliers":
             return self._json(201, products.add_supplier(conn, user, body, ip=ip, ua=ua))
+        m = _ADMIN_SUPPLIER_RE.match(path)
+        if m and method == "PATCH":
+            return self._json(200, products.update_supplier(
+                conn, user, int(m.group(1)), body, ip=ip, ua=ua))
         if method == "POST" and path == "/api/admin/catalog/preview":
             return self._json(200, products.preview_catalog(conn, user, body))
         if method == "POST" and path == "/api/admin/catalog/import":
@@ -457,6 +478,7 @@ def main():
     print("  GET /api/manager/team|assignments ; POST /api/manager/assignments")
     print("  GET/POST /api/admin/users ; PATCH /api/admin/users/<id>")
     print("  GET /api/products/search ; POST /api/products/quote")
+    print("  POST /api/material-lists/<id>/quote-requests ; PATCH /api/material-quote-requests/<id>")
     print("  GET/POST /api/admin/suppliers ; POST /api/admin/catalog/preview|import")
     print("  POST /api/admin/contact-enrichment/preview|import")
     print("  GET /api/admin/catalog/imports ; GET/PATCH /api/admin/pricing/delivery")
