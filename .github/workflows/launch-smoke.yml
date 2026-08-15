@@ -24,6 +24,7 @@ jobs:
           python -m pytest \
             pipeline/tests/test_material_quote_workflow.py \
             pipeline/tests/test_lead_role_classification.py \
+            pipeline/tests/test_release_11_rollout.py \\
             pipeline/tests/test_workspace_ui.py -q
       - name: Check JavaScript syntax
         run: |
