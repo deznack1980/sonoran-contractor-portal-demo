@@ -13,6 +13,7 @@ import argparse
 import json
 import sqlite3
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import URLError
@@ -41,6 +42,16 @@ def _server_running() -> bool:
             return payload.get("service") == "corridoriq-sales"
     except (OSError, URLError, ValueError, json.JSONDecodeError):
         return False
+
+
+def _wait_for_server_stop(*, attempts: int = 40, delay_seconds: float = 0.5) -> bool:
+    """Allow a verified CorridorIQ process time to release its listening socket."""
+    for attempt in range(attempts):
+        if not _server_running():
+            return True
+        if attempt + 1 < attempts:
+            time.sleep(delay_seconds)
+    return False
 
 
 def _snapshot(conn: sqlite3.Connection) -> dict:
@@ -102,6 +113,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if args.apply and _server_running():
+        print("WAITING: CorridorIQ is finishing its shutdown (up to 20 seconds).")
+        if not _wait_for_server_stop():
+            print("\nSTOPPED: CorridorIQ is still running.")
+            print("Close the portal server or use ApplyCorridorIQLeadIntegrity.bat.")
+            print("No database changes were made and no backup was created by this run.")
+            return 2
+
     conn = init_db()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     try:
@@ -113,11 +132,6 @@ def main() -> int:
             print("\nREAD-ONLY CHECK COMPLETE")
             print("Run again with --apply after closing CorridorIQ.")
             return 0
-
-        if _server_running():
-            print("\nSTOPPED: CorridorIQ is currently running.")
-            print("Close the portal server or use ApplyCorridorIQLeadIntegrity.bat.")
-            return 2
 
         backup_path = _backup_database(conn, stamp)
         print(f"\nBACKUP: {backup_path}")

@@ -25,14 +25,13 @@ if /I "%PORTAL_STATE%"=="foreign" (
 
 if /I "%PORTAL_STATE%"=="corridoriq" (
   echo Stopping CorridorIQ safely before the database correction...
-  powershell -NoProfile -Command "try { $j=Invoke-RestMethod -Uri 'http://127.0.0.1:%PORT%/api/health' -TimeoutSec 2; if ($j.service -ne 'corridoriq-sales') { exit 2 }; Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction Stop }; exit 0 } catch { exit 1 }"
+  powershell -NoProfile -Command "try { $j=Invoke-RestMethod -Uri 'http://127.0.0.1:%PORT%/api/health' -TimeoutSec 2; if ($j.service -ne 'corridoriq-sales') { exit 2 }; $pids=@(Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique); $pids | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; $released=$false; for ($i=0; $i -lt 40; $i++) { $listener=Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue; if (-not $listener) { $released=$true; break }; Start-Sleep -Milliseconds 500 }; if (-not $released) { exit 3 }; exit 0 } catch { exit 1 }"
   if errorlevel 1 (
     echo CorridorIQ could not be stopped safely.
     echo Close its PowerShell window and run this file again.
     pause
     exit /b 1
   )
-  timeout /t 2 /nobreak >nul
 )
 
 echo.
@@ -44,7 +43,12 @@ echo.
 if errorlevel 1 (
   echo.
   echo Lead Integrity did not complete successfully.
-  echo Review the message above. The backup was preserved.
+  if errorlevel 2 (
+    echo The safety check stopped before database changes or a new backup.
+  ) else (
+    echo Review the message above.
+    echo If this run created a backup, it remains in pipeline\db\backups.
+  )
   pause
   exit /b 1
 )
