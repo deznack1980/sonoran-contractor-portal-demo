@@ -6,7 +6,7 @@
   <title>CorridorIQ — Material List Intake</title>
   <link rel="stylesheet" href="portal.css" />
 </head>
-<body>
+<body class="material-list-page">
   <template id="pageContent">
     <div class="page-head">
       <div>
@@ -56,7 +56,6 @@
             <h2>Bill of Materials</h2>
             <div class="muted" style="font-size:12px">Review every line before pricing</div>
           </div>
-          <button class="btn btn-sm" id="addRowBtn" type="button">+ Add Item</button>
         </div>
         <div class="table-wrap bom-table-wrap" style="border:0;border-radius:0">
           <table class="tbl responsive" id="bomTable">
@@ -72,6 +71,7 @@
             <div><span>Status</span><strong id="bomStatus">Draft</strong></div>
           </div>
           <div class="stack" style="flex-direction:row;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="addRowBtn" type="button">+ Add Item</button>
             <button class="btn" id="requestReviewBtn" type="button">Submit for Review</button>
             <button class="btn btn-primary" id="priceBtn" type="button">Price with Sonoran</button>
           </div>
@@ -95,3 +95,4 @@
   <script src="material-list-intake.js"></script>
 </body>
 </html>
+

@@ -303,9 +303,11 @@ def _refresh_company_intelligence(conn: sqlite3.Connection) -> None:
     from pipeline.company_resolution.backfill import backfill_companies
     from pipeline.company_resolution.export import export_all as export_companies
     from pipeline.company_resolution.metrics import compute_company_metrics
+    from pipeline.company_resolution.lead_role_correction import apply_lead_role_correction
     from pipeline.company_resolution.timeline import rebuild_company_timeline
 
     backfill_companies(conn, resume=True)
+    apply_lead_role_correction(conn)
     compute_company_metrics(conn)
     rebuild_company_timeline(conn)
     export_companies(conn)

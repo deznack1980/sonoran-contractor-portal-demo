@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 set "PORT=8780"
-set "BUILD=2026-08-06-launcher-v2"
+set "BUILD=2026-08-15-rfq-cart-v1"
 set "URL=http://127.0.0.1:%PORT%/login.html?build=%BUILD%"
 
 REM Prefer the Windows py launcher, then python.
@@ -61,3 +61,4 @@ if /I not "%PORTAL_STATE%"=="current" (
 
 start "" "%URL%"
 endlocal
+

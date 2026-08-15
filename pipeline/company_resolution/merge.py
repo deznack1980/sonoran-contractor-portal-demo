@@ -30,18 +30,26 @@ def ensure_role(
     is_primary: bool = False,
     source: str | None = None,
     confidence: float | None = None,
+    verification_status: str | None = None,
+    evidence_source: str | None = None,
+    evidence_field: str | None = None,
 ) -> None:
     now = _now()
     conn.execute(
         """
         INSERT INTO company_roles
-            (company_id, role_type, is_primary, source, confidence, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (company_id, role_type, is_primary, source, confidence,
+             verification_status, evidence_source, evidence_field, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(company_id, role_type) DO UPDATE SET
             is_primary = MAX(company_roles.is_primary, excluded.is_primary),
+            verification_status = COALESCE(excluded.verification_status, company_roles.verification_status),
+            evidence_source = COALESCE(excluded.evidence_source, company_roles.evidence_source),
+            evidence_field = COALESCE(excluded.evidence_field, company_roles.evidence_field),
             updated_at = excluded.updated_at
         """,
-        (company_id, role_type, 1 if is_primary else 0, source, confidence, now, now),
+        (company_id, role_type, 1 if is_primary else 0, source, confidence,
+         verification_status, evidence_source, evidence_field, now, now),
     )
     if is_primary:
         conn.execute(

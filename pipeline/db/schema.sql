@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS permits (
     public_notes                   TEXT,
     inspector                     TEXT,
     project_description              TEXT,
+    applicant_name                   TEXT,
+    applicant_organization           TEXT,
+    responsible_party_name           TEXT,
+    permit_professional_name         TEXT,
+    contractor_source_role           TEXT,
+    contractor_source_field          TEXT,
+    contractor_evidence_confidence   REAL,
+    contractor_verification_status   TEXT,
+    lead_type                        TEXT,
+    why_this_lead                    TEXT,
     raw_source_json                 TEXT,
     contractor_company_id            INTEGER REFERENCES companies(id),
     first_seen_at                   TEXT NOT NULL,
@@ -432,6 +442,10 @@ CREATE TABLE IF NOT EXISTS companies (
     year_established    INTEGER,
     employee_range      TEXT,
     revenue_range       TEXT,
+    lead_type           TEXT,
+    lead_verification_status TEXT,
+    lead_source         TEXT,
+    why_this_lead       TEXT,
     source_system       TEXT,
     source_record_id    TEXT,
     merged_into_id      INTEGER REFERENCES companies(id),
@@ -463,12 +477,60 @@ CREATE TABLE IF NOT EXISTS company_roles (
     effective_to        TEXT,
     source              TEXT,
     confidence          REAL,
+    verification_status TEXT,
+    evidence_source     TEXT,
+    evidence_field      TEXT,
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL,
     UNIQUE(company_id, role_type)
 );
 CREATE INDEX IF NOT EXISTS idx_company_roles_company ON company_roles(company_id);
 CREATE INDEX IF NOT EXISTS idx_company_roles_type    ON company_roles(role_type);
+
+CREATE TABLE IF NOT EXISTS permit_party_evidence (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    permit_id           INTEGER NOT NULL REFERENCES permits(id),
+    company_id          INTEGER REFERENCES companies(id),
+    party_name          TEXT NOT NULL,
+    source_role         TEXT NOT NULL,
+    source_field        TEXT NOT NULL,
+    lead_type           TEXT NOT NULL,
+    verification_status TEXT NOT NULL,
+    confidence          REAL NOT NULL,
+    is_contractor_evidence INTEGER NOT NULL DEFAULT 0,
+    why_this_lead       TEXT,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(permit_id, source_field, party_name)
+);
+CREATE INDEX IF NOT EXISTS idx_permit_party_evidence_permit ON permit_party_evidence(permit_id);
+CREATE INDEX IF NOT EXISTS idx_permit_party_evidence_company ON permit_party_evidence(company_id);
+CREATE INDEX IF NOT EXISTS idx_permit_party_evidence_type ON permit_party_evidence(lead_type, verification_status);
+
+CREATE TABLE IF NOT EXISTS company_lead_classification (
+    company_id          INTEGER PRIMARY KEY REFERENCES companies(id),
+    lead_type           TEXT NOT NULL,
+    verification_status TEXT NOT NULL,
+    source              TEXT,
+    source_field        TEXT,
+    confidence          REAL NOT NULL,
+    why_this_lead       TEXT NOT NULL,
+    explicit_contractor_permits INTEGER NOT NULL DEFAULT 0,
+    ambiguous_permit_contacts INTEGER NOT NULL DEFAULT 0,
+    classification_version TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_company_lead_type ON company_lead_classification(lead_type);
+
+CREATE TABLE IF NOT EXISTS lead_role_assignment_history (
+    migration_key       TEXT NOT NULL,
+    permit_id           INTEGER NOT NULL REFERENCES permits(id),
+    prior_general_contractor_name TEXT,
+    prior_contractor_company_id INTEGER,
+    prior_project_contractor_company_id INTEGER,
+    recorded_at         TEXT NOT NULL,
+    PRIMARY KEY(migration_key, permit_id)
+);
 
 -- contacts: never invented from permit descriptions. Only populated
 -- from real source contact fields.
@@ -696,6 +758,10 @@ CREATE TABLE IF NOT EXISTS crm_company_relationships (
     assigned_by         INTEGER REFERENCES users(id),
     assigned_at         TEXT,
     lead_source         TEXT,
+    lead_type           TEXT,
+    lead_verification_status TEXT,
+    lead_classification_source TEXT,
+    why_this_lead       TEXT,
     priority_override   TEXT,
     do_not_contact      INTEGER NOT NULL DEFAULT 0,
     do_not_contact_reason TEXT,
@@ -989,3 +1055,4 @@ CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_org_status
     ON supplier_quote_requests(organization_id, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_list
     ON supplier_quote_requests(material_list_id, updated_at DESC);
+

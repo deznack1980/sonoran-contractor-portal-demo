@@ -30,6 +30,7 @@ function currentFilters() {
   return {
     q: document.getElementById("searchInput").value.trim(),
     role: document.getElementById("roleFilter").value,
+    lead_type: document.getElementById("leadTypeFilter").value,
     tier: document.getElementById("tierFilter").value,
     municipality: document.getElementById("municipalityFilter").value,
     active: document.getElementById("activeToggle").checked ? "1" : "",
@@ -52,6 +53,7 @@ async function fetchCompanies() {
   let items = data.items || [];
   if (f.q) items = items.filter((c) => (c.display_name || "").toLowerCase().includes(f.q.toLowerCase()));
   if (f.role) items = items.filter((c) => (c.roles || []).includes(f.role));
+  if (f.lead_type && f.lead_type !== "all") items = items.filter((c) => c.lead_type === f.lead_type);
   if (f.tier) items = items.filter((c) => c.company_priority_tier === f.tier);
   if (f.active) items = items.filter((c) => (c.active_projects || 0) > 0);
   if (f.commercial) items = items.filter((c) => (c.commercial_project_count || 0) > 0);
@@ -87,7 +89,7 @@ function renderTable(payload) {
   const tbody = document.querySelector("#companiesTable tbody");
   const rows = payload.items || [];
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:24px;">No companies match these filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:24px;">No companies match these filters.</td></tr>`;
   } else {
     tbody.innerHTML = rows.map((c) => {
       const tier = c.company_priority_tier || "Low";
@@ -98,7 +100,10 @@ function renderTable(payload) {
       return `<tr>
         <td><a class="company-name-link" href="company-profile.html?id=${c.id}">${esc(c.display_name || "—")}</a>
             <div>${roles}</div></td>
-        <td>${esc(c.company_type_primary || "—")}</td>
+        <td>${esc((c.lead_type || "unverified_permit_contact").replaceAll("_", " "))}</td>
+        <td>${esc((c.lead_verification_status || "unverified").replaceAll("_", " "))}</td>
+        <td>${esc(c.lead_source || "—")}</td>
+        <td>${esc(c.why_this_lead || "—")}</td>
         <td><span class="tier-badge tier-${esc(tier)}">${fmtScore(c.company_priority_score)} · ${esc(tier)}</span></td>
         <td>${fmtNum(c.active_projects)}</td>
         <td>${fmtNum(c.projects_last_30_days)}</td>
@@ -143,7 +148,7 @@ async function refresh() {
 function wire() {
   const debounced = (() => { let t; return (fn) => { clearTimeout(t); t = setTimeout(fn, 250); }; })();
   document.getElementById("searchInput").addEventListener("input", () => debounced(() => { page = 1; refresh(); }));
-  ["roleFilter", "tierFilter", "municipalityFilter"].forEach((id) =>
+  ["roleFilter", "leadTypeFilter", "tierFilter", "municipalityFilter"].forEach((id) =>
     document.getElementById(id).addEventListener("change", () => { page = 1; refresh(); }));
   ["activeToggle", "commercialToggle", "residentialToggle"].forEach((id) =>
     document.getElementById(id).addEventListener("change", () => { page = 1; refresh(); }));

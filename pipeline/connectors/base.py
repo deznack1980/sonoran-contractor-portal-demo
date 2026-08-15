@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
+from pipeline.company_resolution.normalize import is_placeholder_name
+
 
 class ConnectorNotConfiguredError(Exception):
     """Raised when a connector is registered but lacks a verified endpoint."""
@@ -36,6 +38,10 @@ PERMIT_FIELDS = [
     "contractor_license_number", "valuation", "square_footage",
     "occupancy_type", "permit_url", "public_notes", "inspector",
     "project_description",
+    "applicant_name", "applicant_organization", "responsible_party_name",
+    "permit_professional_name", "contractor_source_role",
+    "contractor_source_field", "contractor_evidence_confidence",
+    "contractor_verification_status", "lead_type", "why_this_lead",
 ]
 
 
@@ -86,3 +92,9 @@ def _safe_json(raw: dict) -> str:
 
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def explicit_contractor_name(value) -> str | None:
+    """Return a usable explicit contractor value, excluding placeholders."""
+    cleaned = " ".join(str(value or "").split()).strip()
+    return None if not cleaned or is_placeholder_name(cleaned) else cleaned

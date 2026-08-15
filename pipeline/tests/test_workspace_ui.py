@@ -596,9 +596,10 @@ def test_material_list_mobile_and_action_clarity_contract():
                ("Open Email", "Mark Sent", "Record response", "Mark declined", "Award quote"))
     for label in ("Quantity", "Item", "Unit", "Manufacturer", "Alternates", "Catalog match", "Action"):
         assert f'data-label="{label}"' in script
-    # Catalog results expand inside the material row instead of being clipped
-    # by the table scroller, and the two-column workspace collapses before mobile.
-    assert ".bom-table-wrap .catalog-suggestions{position:static" in css
+    # Catalog results render in a body-level portal so table scrolling cannot
+    # clip them, and the two-column workspace collapses before mobile.
+    assert ".catalog-suggestions-portal{position:fixed" in css
+    assert 'catalogPopup.className = "catalog-suggestions catalog-suggestions-portal"' in script
     assert "@media(max-width:1180px){.material-workspace{grid-template-columns:1fr}" in css
     assert "@media(max-width:700px)" in css and ".bom-table-wrap{overflow:visible}" in css
 
@@ -692,3 +693,170 @@ def test_login_form_browser_flow(http_server):
         if "Executable doesn't exist" in str(exc) or "chromium" in str(exc).lower():
             pytest.skip(f"Playwright browser unavailable: {exc}")
         raise
+
+
+def test_cart_dropdown_checkout_mouse_touch_and_keyboard(http_server):
+    """Regression: the shared cart stays interactive and on-screen through checkout."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    base = f"http://127.0.0.1:{http_server['port']}"
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            pytest.skip("Chromium not installed for Playwright")
+
+        def login(page):
+            page.goto(base + "/login.html")
+            page.fill("#email", "uiadmin@corridoriq.com")
+            page.fill("#password", "UiAdmin123")
+            page.click("#loginBtn")
+            page.wait_for_url("**/admin-dashboard.html")
+
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        login(page)
+        page.evaluate("""CIQ.cart.clear();
+          CIQ.cart.add({productId:1,supplierId:10,name:'Copper Pipe',sku:'CP-10',supplier:'Acme',unitPrice:12.5,quantity:2});
+          CIQ.cart.add({productId:2,supplierId:11,name:'Valve',sku:'VL-2',supplier:'Best Supply',unitPrice:5,quantity:1});""")
+        page.click("#ciqCartBtn")
+        assert page.locator("#ciqCartDropdown").is_visible()
+        assert page.locator(".cart-item").count() == 2
+        assert page.locator("#ciqCartSubtotal").inner_text() == "$30.00"
+        page.locator('[data-cart-key="1:10"] [data-cart-action="increase"]').click()
+        assert page.locator("#ciqCartTotal").inner_text() == "$42.50"
+        page.locator('[data-cart-key="2:11"] [data-cart-action="remove"]').click()
+        assert page.locator(".cart-item").count() == 1
+        page.keyboard.press("Escape")
+        assert page.locator("#ciqCartDropdown").is_hidden()
+        page.click("#ciqCartBtn")
+        page.click("#content")
+        assert page.locator("#ciqCartDropdown").is_hidden()
+        page.click("#ciqCartBtn")
+        page.click("#ciqCheckoutBtn")
+        page.wait_for_url("**/checkout.html")
+        assert "Copper Pipe" in page.locator("#checkoutLines").inner_text()
+        assert page.locator("#placeOrderBtn").is_visible()
+        page.click("#ciqCartBtn")
+        assert page.locator("#ciqCartDropdown").is_visible()
+        assert page.locator("#ciqCartBtn").get_attribute("aria-expanded") == "true"
+        assert page.locator("#ciqCartDropdown .cart-item").count() == 1
+        page.click("#ciqCartBtn")
+        assert page.locator("#ciqCartDropdown").is_hidden()
+        page.click("#placeOrderBtn")
+        page.wait_for_url("**/material-list-intake.html?from_cart=1")
+        assert page.get_by_label("Description").input_value() == "Copper Pipe"
+        assert page.locator("#rfqPanel").is_visible()
+        assert errors == []
+        ctx.close()
+
+        mobile = browser.new_context(viewport={"width": 390, "height": 700}, has_touch=True, is_mobile=True)
+        phone = mobile.new_page()
+        mobile_errors = []
+        phone.on("pageerror", lambda error: mobile_errors.append(str(error)))
+        login(phone)
+        phone.evaluate("CIQ.cart.add({productId:3,supplierId:12,name:'Long mobile product description',sku:'M-3',supplier:'Mobile Supply',unitPrice:9.99,quantity:4})")
+        phone.tap("#ciqCartBtn")
+        panel = phone.locator("#ciqCartDropdown")
+        assert panel.is_visible()
+        box = panel.bounding_box()
+        checkout_box = phone.locator("#ciqCheckoutBtn").bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 390
+        assert checkout_box and checkout_box["y"] + checkout_box["height"] <= 700
+        phone.tap('[data-cart-action="increase"]')
+        assert phone.locator("#ciqCartTotal").inner_text() == "$49.95"
+        phone.tap("#ciqCheckoutBtn")
+        phone.wait_for_url("**/checkout.html")
+        phone.tap("#ciqCartBtn")
+        checkout_panel = phone.locator("#ciqCartDropdown")
+        assert checkout_panel.is_visible()
+        checkout_panel_box = checkout_panel.bounding_box()
+        checkout_button_box = phone.locator("#ciqCheckoutBtn").bounding_box()
+        assert checkout_panel_box and checkout_panel_box["x"] >= 0
+        assert checkout_panel_box["x"] + checkout_panel_box["width"] <= 390
+        assert checkout_button_box and checkout_button_box["y"] + checkout_button_box["height"] <= 700
+        phone.tap("#ciqCartBtn")
+        phone.tap("#placeOrderBtn")
+        phone.wait_for_url("**/material-list-intake.html?from_cart=1")
+        assert phone.get_by_label("Description").input_value() == "Long mobile product description"
+        assert mobile_errors == []
+        mobile.close()
+        browser.close()
+
+
+def test_material_catalog_popup_uses_body_portal_and_all_input_modes(http_server):
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    base = f"http://127.0.0.1:{http_server['port']}"
+    products = {"total": 2, "items": [
+        {"product_id": 101, "sku": "COP-1", "supplier_sku": "S-COP-1", "product_name": "Copper Pipe", "manufacturer": "CopperCo", "manufacturer_part_number": "CP1", "unit_of_measure": "each", "supplier_price": 12.5, "quantity_available": 40, "lead_time_days": 0},
+        {"product_id": 102, "sku": "COP-2", "supplier_sku": "S-COP-2", "product_name": "Copper Coupling", "manufacturer": "CopperCo", "manufacturer_part_number": "CP2", "unit_of_measure": "each", "supplier_price": 4.25, "quantity_available": 80, "lead_time_days": 1},
+    ]}
+
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            pytest.skip("Chromium not installed for Playwright")
+
+        def prepare(context, viewport):
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.route("**/api/products/search?**", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(products)))
+            page.goto(base + "/login.html")
+            page.fill("#email", "uiadmin@corridoriq.com")
+            page.fill("#password", "UiAdmin123")
+            page.click("#loginBtn")
+            page.wait_for_url("**/admin-dashboard.html")
+            page.goto(base + "/material-list-intake.html")
+            return page, errors
+
+        desktop = browser.new_context(viewport={"width": 1920, "height": 1080})
+        page, errors = prepare(desktop, (1920, 1080))
+        field = page.get_by_label("Description")
+        field.fill("copper")
+        popup = page.locator(".catalog-suggestions-portal")
+        popup.wait_for(state="visible")
+        assert popup.locator(".catalog-option").count() == 2
+        assert popup.evaluate("node => node.parentElement === document.body")
+        input_box, popup_box = field.bounding_box(), popup.bounding_box()
+        assert input_box and popup_box and popup_box["y"] >= input_box["y"] + input_box["height"]
+        assert popup_box["x"] >= 0 and popup_box["x"] + popup_box["width"] <= 1920
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("Enter")
+        assert field.input_value() == "Copper Pipe"
+        assert page.get_by_text("Matched", exact=True).is_visible()
+
+        field.fill("copper")
+        popup.wait_for(state="visible")
+        page.keyboard.press("Escape")
+        assert popup.is_hidden()
+        field.fill("copper")
+        popup.wait_for(state="visible")
+        page.get_by_label("Contractor / company").click()
+        assert popup.is_hidden()
+        assert errors == []
+        desktop.close()
+
+        mobile = browser.new_context(viewport={"width": 390, "height": 700}, is_mobile=True, has_touch=True)
+        phone, mobile_errors = prepare(mobile, (390, 700))
+        mobile_field = phone.get_by_label("Description")
+        mobile_field.evaluate("node => node.scrollIntoView({block:'end'})")
+        mobile_field.fill("copper")
+        mobile_popup = phone.locator(".catalog-suggestions-portal")
+        mobile_popup.wait_for(state="visible")
+        mobile_box = mobile_popup.bounding_box()
+        assert mobile_box and mobile_box["x"] >= 0 and mobile_box["x"] + mobile_box["width"] <= 390
+        assert mobile_popup.evaluate("node => node.parentElement === document.body")
+        assert "opens-above" in (mobile_popup.get_attribute("class") or "")
+        phone.tap('.catalog-option[data-option="1"]')
+        assert mobile_field.input_value() == "Copper Coupling"
+        assert mobile_popup.is_hidden()
+        assert mobile_errors == []
+        mobile.close()
+        browser.close()

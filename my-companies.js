@@ -2,10 +2,13 @@
 (function () {
   let isManager = false;
   let page = 1;
-  const filters = {};
+  const filters = { lead_type: "verified_contractor" };
 
   const VIEWS = [
-    ["priority", "Priority", {}],
+    ["verified", "Verified Contractors", { lead_type: "verified_contractor" }],
+    ["specifier", "Architect / Engineer", { lead_type: "specifier_architect_engineer" }],
+    ["owner", "Owner / Developer", { lead_type: "owner_developer" }],
+    ["unverified", "Unverified Contacts", { lead_type: "unverified_permit_contact" }],
     ["contact", "Contact Ready", { contact_info: "available" }],
     ["enrichment", "Needs Enrichment", { contact_info: "missing" }],
     ["never", "Never Contacted", { contacted: "never" }],
@@ -26,8 +29,9 @@
   function applyView(key) {
     const def = VIEWS.find((v) => v[0] === key);
     // Reset filter-driven fields, keep search text.
-    ["status", "tier", "followup", "contacted", "contact_info", "do_not_contact", "municipality"].forEach((k) => delete filters[k]);
+    ["status", "tier", "followup", "contacted", "contact_info", "do_not_contact", "municipality", "lead_type"].forEach((k) => delete filters[k]);
     document.getElementById("fstatus").value = "";
+    document.getElementById("flead").value = "all";
     document.getElementById("ftier").value = "";
     document.getElementById("ffollowup").value = "";
     document.getElementById("fcontacted").value = "";
@@ -35,6 +39,7 @@
     Object.assign(filters, def ? def[2] : {});
     document.getElementById("ffollowup").value = filters.followup || "";
     document.getElementById("fstatus").value = filters.status || "";
+    document.getElementById("flead").value = filters.lead_type || "all";
     document.getElementById("fcontacted").value = filters.contacted || "";
     renderViews(key);
     page = 1; load();
@@ -48,6 +53,7 @@
         <div>
           <div class="cc-name"><a href="sales-company-profile.html?id=${c.company_id}">${CIQ.esc(c.display_name)}</a></div>
           <div class="cc-loc">${CIQ.esc([c.city, c.state].filter(Boolean).join(", ") || "—")}${c.primary_role ? " · " + CIQ.esc(CIQ.titleCase(c.primary_role)) : ""}</div>
+          <div class="cc-loc">${CIQ.esc(CIQ.titleCase((c.lead_type || "unverified_permit_contact").replaceAll("_", " ")))} · ${CIQ.esc(CIQ.titleCase((c.lead_verification_status || "unverified").replaceAll("_", " ")))}</div>
         </div>
         <div class="stack" style="align-items:flex-end;gap:6px">
           ${CIQ.tierBadge(c.company_priority_tier)}${CIQ.statusBadge(c.relationship_status)}
@@ -55,6 +61,7 @@
         </div>
       </div>
       <div class="cc-reason">${CIQ.esc(c.reason)}</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">Source: ${CIQ.esc(c.lead_source || "permit evidence")}</div>
       <div class="cc-meta">
         <div><span>Active projects</span>${c.active_projects || 0}</div>
         <div><span>Last 30 days</span>${c.projects_last_30_days || 0}</div>
@@ -103,7 +110,7 @@
     };
     const fq = document.getElementById("fq");
     fq.addEventListener("input", CIQ.debounce(() => { filters.q = fq.value.trim(); page = 1; load(); }, 350));
-    set("fstatus", "status"); set("ftier", "tier"); set("ffollowup", "followup");
+    set("fstatus", "status"); set("flead", "lead_type"); set("ftier", "tier"); set("ffollowup", "followup");
     set("fcontacted", "contacted");
     const fmuni = document.getElementById("fmuni");
     fmuni.addEventListener("input", CIQ.debounce(() => { filters.municipality = fmuni.value.trim(); page = 1; load(); }, 350));
@@ -116,7 +123,9 @@
       ["fq", "fstatus", "ftier", "fmuni", "ffollowup", "fcontacted", "frep"].forEach((id) => {
         const el = document.getElementById(id); if (el) el.value = "";
       });
-      page = 1; renderViews("priority"); load();
+      filters.lead_type = "verified_contractor";
+      document.getElementById("flead").value = "verified_contractor";
+      page = 1; renderViews("verified"); load();
     });
   }
 
@@ -156,7 +165,7 @@
     if (tier) { filters.tier = tier; document.getElementById("ftier").value = tier; }
     if (view === "followup") { filters.followup = "due"; document.getElementById("ffollowup").value = "due"; renderViews("followup"); }
     else if (view === "overdue") { filters.followup = "overdue"; document.getElementById("ffollowup").value = "overdue"; renderViews(null); }
-    else if (!q && !status && !tier) { renderViews("priority"); }
+    else if (!q && !status && !tier) { renderViews("verified"); }
     else renderViews(null);
     load();
   });

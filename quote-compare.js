@@ -23,7 +23,7 @@
     return v + " day" + (Number(v) === 1 ? "" : "s");
   }
 
-  function renderOffer(o, recommendedId) {
+  function renderOffer(o, recommendedId, product, quantity) {
     const isRec = o.supplier_id === recommendedId;
     const cls = "offer-card" + (isRec ? " recommended" : "") + (o.available ? "" : " unavailable");
     const flags = (o.warnings || []).map((w) =>
@@ -48,6 +48,7 @@
           <div><span>Warehouse</span>${CIQ.esc(o.warehouse_location || "—")}</div>
         </div>
         ${flags ? `<div style="margin-top:8px">${flags}</div>` : ""}
+        <button class="btn btn-primary btn-sm" type="button" data-add-offer data-offer="${CIQ.esc(JSON.stringify({ productId: product.id, supplierId: o.supplier_id, name: product.product_name || product.sku, sku: product.sku, supplier: o.supplier, unitPrice: quantity ? o.material_subtotal / quantity : o.material_subtotal, quantity }))}" ${o.available ? "" : "disabled"}>Add to cart</button>
       </div>`;
   }
 
@@ -80,7 +81,11 @@
       return;
     }
     offersEl.innerHTML = data.offers.map((o) =>
-      renderOffer(o, data.recommended_supplier_id)).join("");
+      renderOffer(o, data.recommended_supplier_id, data.product, quantity)).join("");
+    offersEl.querySelectorAll("[data-add-offer]").forEach((button) => button.addEventListener("click", () => {
+      CIQ.cart.add(JSON.parse(button.dataset.offer));
+      CIQ.toast("Added to cart", "success");
+    }));
   }
 
   document.addEventListener("DOMContentLoaded", async () => {

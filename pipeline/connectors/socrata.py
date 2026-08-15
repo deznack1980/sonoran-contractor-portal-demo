@@ -12,7 +12,7 @@ from typing import Callable, Iterable, Optional, Union
 import requests
 
 from pipeline.config.settings import HTTP_REQUEST_DELAY_SECONDS, HTTP_USER_AGENT, SOCRATA_PAGE_SIZE
-from pipeline.connectors.base import BaseConnector
+from pipeline.connectors.base import BaseConnector, explicit_contractor_name
 
 
 # field_map values are either:
@@ -117,11 +117,14 @@ MESA_FIELD_MAP = {
     # Prefer licensed contractor_name; when the city only published an
     # applicant (common on recent Mesa rows), use that rather than leaving
     # the outreach field blank — never invent a name that isn't in the source.
-    "general_contractor_name": lambda raw: (
-        (raw.get("contractor_name") or "").strip()
-        or (raw.get("applicant") or "").strip()
-        or None
-    ),
+    "general_contractor_name": lambda raw: explicit_contractor_name(raw.get("contractor_name")),
+    "applicant_name": lambda raw: (raw.get("applicant") or "").strip() or None,
+    "contractor_source_role": lambda raw: "contractor" if explicit_contractor_name(raw.get("contractor_name")) else None,
+    "contractor_source_field": lambda raw: "contractor_name" if explicit_contractor_name(raw.get("contractor_name")) else None,
+    "contractor_evidence_confidence": lambda raw: 1.0 if explicit_contractor_name(raw.get("contractor_name")) else None,
+    "contractor_verification_status": lambda raw: "verified" if explicit_contractor_name(raw.get("contractor_name")) else "unverified",
+    "lead_type": lambda raw: "verified_contractor" if explicit_contractor_name(raw.get("contractor_name")) else "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Mesa contractor_name is explicit contractor evidence" if explicit_contractor_name(raw.get("contractor_name")) else "Mesa publishes no usable explicit contractor identity",
     "permit_url": lambda raw: None,  # Mesa's SODA API doesn't expose a per-record URL
 }
 

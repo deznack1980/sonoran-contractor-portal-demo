@@ -79,6 +79,27 @@ _KNOWLEDGE_V21_COLUMNS = [
     ("projects", "architect_company_id", "INTEGER REFERENCES companies(id)"),
     ("projects", "engineer_company_id", "INTEGER REFERENCES companies(id)"),
     ("permits", "contractor_company_id", "INTEGER REFERENCES companies(id)"),
+    ("permits", "applicant_name", "TEXT"),
+    ("permits", "applicant_organization", "TEXT"),
+    ("permits", "responsible_party_name", "TEXT"),
+    ("permits", "permit_professional_name", "TEXT"),
+    ("permits", "contractor_source_role", "TEXT"),
+    ("permits", "contractor_source_field", "TEXT"),
+    ("permits", "contractor_evidence_confidence", "REAL"),
+    ("permits", "contractor_verification_status", "TEXT"),
+    ("permits", "lead_type", "TEXT"),
+    ("permits", "why_this_lead", "TEXT"),
+    ("companies", "lead_type", "TEXT"),
+    ("companies", "lead_verification_status", "TEXT"),
+    ("companies", "lead_source", "TEXT"),
+    ("companies", "why_this_lead", "TEXT"),
+    ("company_roles", "verification_status", "TEXT"),
+    ("company_roles", "evidence_source", "TEXT"),
+    ("company_roles", "evidence_field", "TEXT"),
+    ("crm_company_relationships", "lead_type", "TEXT"),
+    ("crm_company_relationships", "lead_verification_status", "TEXT"),
+    ("crm_company_relationships", "lead_classification_source", "TEXT"),
+    ("crm_company_relationships", "why_this_lead", "TEXT"),
     # Sprint 4 Phase 10 — future per-tenant ownership (NULL = shared canonical).
     ("quotes", "organization_id", "INTEGER"),
     ("deliveries", "organization_id", "INTEGER"),
@@ -187,3 +208,4 @@ if __name__ == "__main__":
     print(f"Database initialized at {DB_PATH}")
     print(f"Seeded {count} jurisdictions.")
     connection.close()
+

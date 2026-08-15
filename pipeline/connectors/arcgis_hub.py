@@ -21,7 +21,7 @@ from typing import Iterable, Optional
 import requests
 
 from pipeline.config.settings import HTTP_REQUEST_DELAY_SECONDS, HTTP_USER_AGENT
-from pipeline.connectors.base import BaseConnector, ConnectorNotConfiguredError
+from pipeline.connectors.base import BaseConnector, ConnectorNotConfiguredError, explicit_contractor_name
 
 ESRI_PAGE_SIZE = 1000
 
@@ -141,14 +141,13 @@ TEMPE_FIELD_MAP = {
     "longitude": lambda raw: raw.get("Longitude"),
     "valuation": lambda raw: raw.get("EstProjectCost"),
     "square_footage": lambda raw: raw.get("TotalSqFt"),
-    "general_contractor_name": lambda raw: (
-        raw.get("ContractorCompanyName")
-        or (
-            str(raw.get("ProjectName")).strip()
-            if _looks_like_company(raw.get("ProjectName"))
-            else None
-        )
-    ),
+    "general_contractor_name": lambda raw: explicit_contractor_name(raw.get("ContractorCompanyName")),
+    "contractor_source_role": lambda raw: "contractor" if explicit_contractor_name(raw.get("ContractorCompanyName")) else None,
+    "contractor_source_field": lambda raw: "ContractorCompanyName" if explicit_contractor_name(raw.get("ContractorCompanyName")) else None,
+    "contractor_evidence_confidence": lambda raw: 1.0 if explicit_contractor_name(raw.get("ContractorCompanyName")) else None,
+    "contractor_verification_status": lambda raw: "verified" if explicit_contractor_name(raw.get("ContractorCompanyName")) else "unverified",
+    "lead_type": lambda raw: "verified_contractor" if explicit_contractor_name(raw.get("ContractorCompanyName")) else "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Tempe ContractorCompanyName is explicit contractor evidence" if explicit_contractor_name(raw.get("ContractorCompanyName")) else "Tempe project name or placeholder is not contractor evidence",
     "contractor_license_number": "ContractorLicNum",
 }
 
@@ -244,7 +243,14 @@ SCOTTSDALE_FIELD_MAP = {
     "valuation": lambda raw: raw.get("Valuation"),
     "square_footage": lambda raw: raw.get("AirConditionedSQFT"),
     "owner_name": "Owner",
-    "general_contractor_name": lambda raw: raw.get("Builder") or raw.get("ResponsibleParty"),
+    "general_contractor_name": lambda raw: explicit_contractor_name(raw.get("Builder")),
+    "responsible_party_name": lambda raw: (raw.get("ResponsibleParty") or "").strip() or None,
+    "contractor_source_role": lambda raw: "builder" if explicit_contractor_name(raw.get("Builder")) else None,
+    "contractor_source_field": lambda raw: "Builder" if explicit_contractor_name(raw.get("Builder")) else None,
+    "contractor_evidence_confidence": lambda raw: 1.0 if explicit_contractor_name(raw.get("Builder")) else None,
+    "contractor_verification_status": lambda raw: "verified" if explicit_contractor_name(raw.get("Builder")) else "unverified",
+    "lead_type": lambda raw: "verified_contractor" if explicit_contractor_name(raw.get("Builder")) else "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Scottsdale Builder is explicit contractor evidence" if explicit_contractor_name(raw.get("Builder")) else "Scottsdale ResponsibleParty or builder placeholder is unverified evidence",
     "latitude": lambda raw: _valid_az_latitude(raw.get("Latitude")),
     "longitude": lambda raw: _valid_az_longitude(raw.get("Longitude")),
     "permit_url": "CityOfScottsdaleMap",
@@ -342,7 +348,12 @@ PEORIA_FIELD_MAP = {
     "finaled_date": lambda raw: _epoch_ms_to_date(raw.get("CmpDate")),
     "job_address": "Project_Address",
     "parcel_number": "APN",
-    "general_contractor_name": lambda raw: raw.get("Applicant_Contact_Organization") or raw.get("Applicant_Contact_Name"),
+    "general_contractor_name": lambda raw: None,
+    "applicant_organization": lambda raw: (raw.get("Applicant_Contact_Organization") or "").strip() or None,
+    "applicant_name": lambda raw: (raw.get("Applicant_Contact_Name") or "").strip() or None,
+    "contractor_verification_status": lambda raw: "unverified",
+    "lead_type": lambda raw: "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Peoria applicant fields are not contractor evidence",
 }
 
 
@@ -384,7 +395,13 @@ GOODYEAR_FIELD_MAP = {
     "valuation": lambda raw: raw.get("PermitValue"),
     "square_footage": lambda raw: raw.get("JobSquareFeet"),
     "owner_name": "OwnerName",
-    "general_contractor_name": "GenConName",
+    "general_contractor_name": lambda raw: explicit_contractor_name(raw.get("GenConName")),
+    "contractor_source_role": lambda raw: "general_contractor" if explicit_contractor_name(raw.get("GenConName")) else None,
+    "contractor_source_field": lambda raw: "GenConName" if explicit_contractor_name(raw.get("GenConName")) else None,
+    "contractor_evidence_confidence": lambda raw: 1.0 if explicit_contractor_name(raw.get("GenConName")) else None,
+    "contractor_verification_status": lambda raw: "verified" if explicit_contractor_name(raw.get("GenConName")) else "unverified",
+    "lead_type": lambda raw: "verified_contractor" if explicit_contractor_name(raw.get("GenConName")) else "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Goodyear GenConName is explicit contractor evidence" if explicit_contractor_name(raw.get("GenConName")) else "Goodyear publishes no usable contractor identity for this permit",
     "contractor_license_number": "GenConLicenseNumber",
 }
 
@@ -457,7 +474,11 @@ PHOENIX_FIELD_MAP = {
     "expiration_date": lambda raw: _epoch_ms_to_date(raw.get("PER_EXPIRE_DATE")),
     "finaled_date": lambda raw: _epoch_ms_to_date(raw.get("PER_COMPL_DATE")),
     "job_address": "STREET_FULL_NAME",
-    "general_contractor_name": _phoenix_contractor,
+    "general_contractor_name": lambda raw: None,
+    "permit_professional_name": lambda raw: (raw.get("PROFESS_NAME") or "").strip() or None,
+    "contractor_verification_status": lambda raw: "unverified",
+    "lead_type": lambda raw: "unverified_permit_contact",
+    "why_this_lead": lambda raw: "Phoenix PROFESS_NAME is an unverified permit professional, not contractor evidence",
 }
 
 

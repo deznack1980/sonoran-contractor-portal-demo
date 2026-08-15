@@ -10,6 +10,8 @@
   let materialListId = null;
   let supplierOptions = [];
   let quoteRequests = [];
+  let catalogPopup = null, catalogInput = null, catalogRow = null;
+  let catalogItems = [], catalogIndex = -1, catalogRequest = 0;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => CIQ.esc(value == null ? "" : value);
@@ -27,6 +29,69 @@
 
   function blankRow(values) {
     return Object.assign({ id: id(), qty: 1, description: "", unit: "each", manufacturer: "", allowSubstitution: true, productId: null, sku: "", supplierPrice: null, quantityAvailable: null, leadTimeDays: null }, values || {});
+  }
+
+  function ensureCatalogPopup() {
+    if (catalogPopup) return catalogPopup;
+    catalogPopup = document.createElement("div");
+    catalogPopup.className = "catalog-suggestions catalog-suggestions-portal";
+    catalogPopup.setAttribute("role", "listbox");
+    catalogPopup.hidden = true;
+    document.body.appendChild(catalogPopup);
+    catalogPopup.addEventListener("pointerdown", (event) => {
+      const option = event.target.closest("[data-option]");
+      if (!option) return;
+      event.preventDefault();
+      selectCatalogItem(Number(option.dataset.option));
+    });
+    return catalogPopup;
+  }
+
+  function closeCatalogPopup() {
+    if (!catalogPopup) return;
+    if (catalogInput) catalogInput.setAttribute("aria-expanded", "false");
+    catalogPopup.hidden = true; catalogPopup.innerHTML = "";
+    catalogInput = null; catalogRow = null; catalogItems = []; catalogIndex = -1;
+  }
+
+  function positionCatalogPopup() {
+    if (!catalogPopup || catalogPopup.hidden || !catalogInput || !catalogInput.isConnected) return;
+    const rect = catalogInput.getBoundingClientRect(), gap = 5, margin = 8;
+    const visual = window.visualViewport;
+    const viewportWidth = visual ? visual.width : Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
+    const viewportHeight = visual ? visual.height : Math.min(window.innerHeight, document.documentElement.clientHeight || window.innerHeight);
+    const viewportLeft = visual ? visual.offsetLeft : 0;
+    const viewportTop = visual ? visual.offsetTop : 0;
+    const desired = Math.min(320, Math.max(120, catalogPopup.scrollHeight));
+    const below = viewportHeight - rect.bottom - margin, above = rect.top - margin;
+    const openAbove = below < Math.min(desired, 180) && above > below;
+    const available = Math.max(96, Math.min(320, (openAbove ? above : below) - gap));
+    const width = Math.min(Math.max(rect.width, 280), viewportWidth - margin * 2);
+    const screenLeft = Math.max(margin, Math.min(rect.left, viewportWidth - margin - width));
+    const screenTop = openAbove ? Math.max(margin, rect.top - gap - available) : rect.bottom + gap;
+    Object.assign(catalogPopup.style, { left: viewportLeft + screenLeft + "px", width: width + "px", maxHeight: available + "px", top: viewportTop + screenTop + "px", bottom: "auto" });
+    catalogPopup.classList.toggle("opens-above", openAbove);
+  }
+
+  function highlightCatalogItem(index) {
+    if (!catalogItems.length) return;
+    catalogIndex = (index + catalogItems.length) % catalogItems.length;
+    catalogPopup.querySelectorAll("[data-option]").forEach((option, i) => {
+      option.classList.toggle("active", i === catalogIndex);
+      option.setAttribute("aria-selected", String(i === catalogIndex));
+      if (i === catalogIndex) option.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function selectCatalogItem(index) {
+    const item = catalogItems[index];
+    if (!item || !catalogRow) return;
+    catalogRow.productId = item.product_id; catalogRow.sku = item.sku || item.supplier_sku || "";
+    catalogRow.description = item.product_name || item.description || item.sku || "";
+    catalogRow.unit = item.unit_of_measure || "each"; catalogRow.manufacturer = item.manufacturer || "";
+    catalogRow.supplierPrice = item.supplier_price; catalogRow.quantityAvailable = item.quantity_available;
+    catalogRow.leadTimeDays = item.lead_time_days;
+    closeCatalogPopup(); render();
   }
 
   function readForm() {
@@ -72,9 +137,10 @@
   }
 
   function render() {
+    closeCatalogPopup();
     $("bomBody").innerHTML = rows.map((r) => `<tr data-id="${esc(r.id)}">
       <td data-label="Quantity"><input aria-label="Quantity" data-field="qty" type="number" min="0" step="1" value="${esc(r.qty)}"></td>
-      <td data-label="Item"><div class="catalog-entry"><input aria-label="Description" data-field="description" value="${esc(r.description)}" placeholder="Type product, SKU, part number…"><div class="catalog-suggestions" data-suggestions="${esc(r.id)}"></div></div></td>
+      <td data-label="Item"><div class="catalog-entry"><input aria-label="Description" data-field="description" value="${esc(r.description)}" placeholder="Type product, SKU, part number…" autocomplete="off" aria-haspopup="listbox" aria-expanded="false"></div></td>
       <td data-label="Unit"><input aria-label="Unit" data-field="unit" value="${esc(r.unit)}" placeholder="each"></td>
       <td data-label="Manufacturer"><input aria-label="Manufacturer" data-field="manufacturer" value="${esc(r.manufacturer)}" placeholder="Optional"></td>
       <td data-label="Alternates"><select aria-label="Alternates" data-field="allowSubstitution"><option value="true" ${r.allowSubstitution !== false ? "selected" : ""}>Allowed</option><option value="false" ${r.allowSubstitution === false ? "selected" : ""}>Exact only</option></select></td>
@@ -96,6 +162,11 @@
         renderCounts();
       });
       input.addEventListener("keydown", (event) => {
+        if (input.dataset.field === "description" && catalogInput === input && catalogPopup && !catalogPopup.hidden) {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); highlightCatalogItem(catalogIndex + (event.key === "ArrowDown" ? 1 : -1)); return; }
+          if (event.key === "Escape") { event.preventDefault(); closeCatalogPopup(); return; }
+          if (event.key === "Enter" && catalogIndex >= 0) { event.preventDefault(); selectCatalogItem(catalogIndex); return; }
+        }
         if (event.key !== "Enter") return;
         event.preventDefault();
         const rowIndex = rows.findIndex((r) => r.id === input.closest("tr").dataset.id);
@@ -114,6 +185,10 @@
           }, 0);
         }
       });
+      if (input.dataset.field === "description") {
+        input.addEventListener("focus", () => { const row = rows.find((r) => r.id === input.closest("tr").dataset.id); if (input.value.trim().length >= 2) scheduleCatalogSearch(input, row); });
+        input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== input) closeCatalogPopup(); }, 0));
+      }
     });
     $("bomBody").querySelectorAll('select[data-field="allowSubstitution"]').forEach((select) => {
       select.addEventListener("change", () => {
@@ -134,28 +209,31 @@
   function scheduleCatalogSearch(input, row) {
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    const target = input.parentElement.querySelector("[data-suggestions]");
-    if (q.length < 2) { target.innerHTML = ""; return; }
+    const target = ensureCatalogPopup();
+    catalogInput = input; catalogRow = row; catalogIndex = -1;
+    if (q.length < 2) { closeCatalogPopup(); return; }
+    const request = ++catalogRequest;
     searchTimer = setTimeout(async () => {
       try {
         const data = await CIQ.api.get("/api/products/search?q=" + encodeURIComponent(q) + "&page_size=8");
+        if (request !== catalogRequest || catalogInput !== input || input.value.trim() !== q) return;
+        catalogItems = data.items || [];
         target.innerHTML = (data.items || []).map((item, index) =>
-          '<button type="button" class="catalog-option" data-option="' + index + '">' +
+          '<button type="button" role="option" aria-selected="false" class="catalog-option" data-option="' + index + '">' +
           '<strong>' + esc(item.product_name || item.sku) + '</strong>' +
           '<span>' + esc([item.sku, item.manufacturer, item.manufacturer_part_number].filter(Boolean).join(" · ")) + '</span>' +
           '<span>' + (item.supplier_price == null ? "Price unavailable" : CIQ.money(item.supplier_price)) +
           ' · ' + (item.quantity_available == null ? "Stock unknown" : Number(item.quantity_available).toLocaleString() + " available") + '</span></button>'
         ).join("") || '<div class="catalog-no-match">No Sonoran catalog match. Keep as a manual item.</div>';
-        target.querySelectorAll("[data-option]").forEach((button) => button.addEventListener("click", () => {
-          const item = data.items[Number(button.dataset.option)];
-          row.productId = item.product_id; row.sku = item.sku || item.supplier_sku || "";
-          row.description = item.product_name || item.description || item.sku || "";
-          row.unit = item.unit_of_measure || "each"; row.manufacturer = item.manufacturer || "";
-          row.supplierPrice = item.supplier_price; row.quantityAvailable = item.quantity_available;
-          row.leadTimeDays = item.lead_time_days; render();
-        }));
+        target.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        positionCatalogPopup();
       } catch (error) {
+        if (request !== catalogRequest) return;
         target.innerHTML = '<div class="catalog-no-match">Catalog search unavailable: ' + esc(error.message) + '</div>';
+        target.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        positionCatalogPopup();
       }
     }, 220);
   }
@@ -505,6 +583,25 @@
     }
   }
 
+  function draftFromCart() {
+    if (CIQ.qs("from_cart") !== "1" || !CIQ.cart || typeof CIQ.cart.items !== "function") return null;
+    const items = CIQ.cart.items();
+    if (!items.length) return null;
+    return {
+      sourceName: "CorridorIQ cart",
+      rows: items.map((item) => blankRow({
+        qty: Math.max(1, Number(item.quantity) || 1),
+        description: item.name || item.sku || "Product",
+        unit: "each",
+        manufacturer: "",
+        productId: item.productId || null,
+        sku: item.sku || "",
+        supplierPrice: Number.isFinite(Number(item.unitPrice)) ? Number(item.unitPrice) : null,
+        allowSubstitution: true,
+      })),
+    };
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const user = await CIQ.guard("projects.view_assigned", {
       title: "Material List Intake",
@@ -513,13 +610,24 @@
     });
     if (!user) return;
 
+    ensureCatalogPopup();
+    window.addEventListener("resize", positionCatalogPopup);
+    window.addEventListener("scroll", positionCatalogPopup, true);
+    document.addEventListener("pointerdown", (event) => {
+      if (!catalogPopup || catalogPopup.hidden) return;
+      if (catalogPopup.contains(event.target) || event.target === catalogInput) return;
+      closeCatalogPopup();
+    });
+
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(storageKey()) || "null"); } catch (e) {}
-    writeForm(draft || { rows: [blankRow()] });
+    const cartDraft = draft ? null : draftFromCart();
+    writeForm(draft || cartDraft || { rows: [blankRow()] });
     const loadedServerDraft = await loadServerDraft(draft);
     if (!loadedServerDraft) await prefillContext();
     if (!$("quoteNeededBy").value) $("quoteNeededBy").value = dateFromToday(2);
     await loadRfqWorkspace();
+    if (cartDraft) CIQ.toast("Cart items loaded into the material list", "success");
 
     $("sourceFile").addEventListener("change", () => {
       const file = $("sourceFile").files[0];

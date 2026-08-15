@@ -34,10 +34,13 @@
           <h1 style="font-size:23px">${CIQ.esc(c.display_name || c.legal_name || "Company")}</h1>
           <div class="ph-meta">
             <span>${CIQ.esc(loc)}</span>
+            <span>Lead Type: <b>${CIQ.esc(CIQ.titleCase((c.lead_type || "unverified_permit_contact").replaceAll("_", " ")))}</b></span>
+            <span>Verification: <b>${CIQ.esc(CIQ.titleCase((c.lead_verification_status || "unverified").replaceAll("_", " ")))}</b></span>
             <span>${CIQ.priorityBadge(ci.company_priority_tier, ci.company_priority_score)}</span>
             <span>${CIQ.statusBadge(r.relationship_status || "new")}</span>
             <span>Rep: <b>${CIQ.esc(repName(r.assigned_user_id))}</b></span>
           </div>
+          <div class="ph-meta"><span>Source: <b>${CIQ.esc(c.lead_source || "permit evidence")}</b></span><span>Why this lead: <b>${CIQ.esc(c.why_this_lead || "Classification pending")}</b></span></div>
           <div class="ph-meta">
             ${c.main_phone ? `<span>☎ <b>${CIQ.esc(c.main_phone)}</b></span>` : ""}
             ${c.main_email ? `<span>✉ <b>${CIQ.esc(c.main_email)}</b></span>` : ""}
