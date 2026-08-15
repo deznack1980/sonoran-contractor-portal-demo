@@ -132,7 +132,7 @@
       <span>${CIQ.esc(label)}</span><strong>${Number(number || 0).toLocaleString()}</strong>
       <small class="source-tag ${sourceClass}">${CIQ.esc(sourceLabel)}</small></div>`;
     document.getElementById("verificationPanel").innerHTML = `<div class="verification-head">
-      <div><span class="live-proof"><i></i> LIVE TEST PROOF</span><h3>Release 15.3 Verified Contractor Foundation: ACTIVE</h3>
+      <div><span class="live-proof"><i></i> LIVE TEST PROOF</span><h3>Release 15.4 Secured Contractor Directory: ACTIVE</h3>
         <p>This panel is rendered by the running server and counted from its connected database—not from a spreadsheet or static mockup.</p></div>
       <div class="verification-build"><span>RUNNING BUILD</span><strong>${CIQ.esc(v.build_id || "Build unavailable")}</strong>
         <small>Database: ${CIQ.esc(v.database_status || "unknown")} · ${CIQ.esc(latest)}</small></div>

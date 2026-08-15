@@ -469,7 +469,7 @@ def test_admin_dashboard_exposes_live_build_and_data_provenance():
 
     assert 'id="verificationPanel"' in html
     assert "LIVE TEST PROOF" in script
-    assert "Release 15.3 Verified Contractor Foundation: ACTIVE" in script
+    assert "Release 15.4 Secured Contractor Directory: ACTIVE" in script
     assert "Verified contractor directory" in script
     for field in ("build_id", "database_status", "public_permit_records",
                   "corridoriq_project_records", "imported_contact_records",
@@ -526,8 +526,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-verified-contractor-foundation-r15.3" in launcher
-    assert 'BUILD_ID = "2026-08-15-verified-contractor-foundation-r15.3"' in server
+    assert "2026-08-15-secured-contractor-directory-r15.4" in launcher
+    assert 'BUILD_ID = "2026-08-15-secured-contractor-directory-r15.4"' in server
 
 
 # --------------------------------------------------------------------------
@@ -1029,8 +1029,8 @@ def test_company_executive_brief_browser_flow(http_server):
         proof = page.locator("#verificationPanel")
         proof.wait_for(state="visible")
         assert "LIVE TEST PROOF" in proof.inner_text()
-        assert "Release 15.3 Verified Contractor Foundation: ACTIVE" in proof.inner_text()
-        assert "2026-08-15-verified-contractor-foundation-r15.3" in proof.inner_text()
+        assert "Release 15.4 Secured Contractor Directory: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-secured-contractor-directory-r15.4" in proof.inner_text()
         assert "Verified contractor directory" in proof.inner_text()
         assert "External evidence" in proof.inner_text()
         assert "Municipal source" in proof.inner_text()
