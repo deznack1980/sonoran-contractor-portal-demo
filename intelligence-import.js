@@ -5,10 +5,15 @@
     "title", "status", "summary", "amount", "effective_date", "expiration_date", "source_url",
     "retrieved_at", "confidence", "match_method"];
   let uploadName = null, uploadB64 = null, previewCounts = null;
+  let rocName = null, rocB64 = null, rocCounts = null;
 
   const escCsv = (value) => `"${String(value == null ? "" : value).replaceAll('"', '""')}"`;
   const status = (message, kind) => {
     document.getElementById("intelligenceStatus").innerHTML = message
+      ? `<div class="status-msg ${kind || "info"}">${CIQ.esc(message)}</div>` : "";
+  };
+  const rocStatus = (message, kind) => {
+    document.getElementById("rocStatus").innerHTML = message
       ? `<div class="status-msg ${kind || "info"}">${CIQ.esc(message)}</div>` : "";
   };
 
@@ -66,17 +71,32 @@
 
   function renderCoverage(data) {
     const total = Number(data.total_crm_companies || 0);
+    const bids = data.public_bids || {};
     document.getElementById("sourceCoverage").innerHTML = (data.sources || []).slice(0, 4).map((source) => {
       const covered = Number(source.companies || 0), pct = total ? Math.round(covered / total * 100) : 0;
       return `<article class="source-coverage-card"><span>${CIQ.esc(source.category)}</span>
         <strong>${CIQ.esc(source.label)}</strong><div><b>${covered.toLocaleString()}</b> / ${total.toLocaleString()} companies</div>
-        <div class="progress"><i style="width:${pct}%"></i></div><small>${Number(source.records || 0).toLocaleString()} evidence records · ${pct}% coverage</small></article>`;
+        <div class="progress"><i style="width:${pct}%"></i></div><small>${Number(source.records || 0).toLocaleString()} evidence records · ${pct}% coverage${source.source_type === "adot" ? ` · ${Number(bids.opportunities || 0)} live bids / ${Number(bids.planholders || 0)} planholders / ${Number(bids.matched_planholders || 0)} matched` : ""}</small></article>`;
     }).join("");
   }
 
   async function loadCoverage() {
     try { renderCoverage(await CIQ.api.get("/api/admin/external-intelligence/coverage")); }
     catch (error) { document.getElementById("sourceCoverage").innerHTML = CIQ.errorBanner(error.message); }
+  }
+
+  async function refreshSources(event) {
+    const approved = await CIQ.confirm("Fetch current ADOT advertisements and planholder contact records now?", { confirmLabel: "Run source refresh" });
+    if (!approved) return;
+    await CIQ.busy(event.currentTarget, async () => {
+      rocStatus("", "info"); status("Fetching current ADOT projects and planholder records…", "info");
+      try {
+        const data = await CIQ.api.post("/api/admin/external-intelligence/refresh", {});
+        const c = data.counts || {};
+        status(`ADOT refresh complete: ${c.opportunities || 0} live projects, ${c.planholders || 0} planholders, ${c.matched_companies || 0} company matches, and ${c.contact_updates || 0} new phone numbers.`, "ok");
+        await loadCoverage();
+      } catch (error) { status(error.message || "Public-source refresh failed.", "err"); }
+    });
   }
 
   function renderRejections(items) {
@@ -142,14 +162,73 @@
     } catch (error) { status(error.message, "err"); }
   }
 
+  function renderRocPreview(data) {
+    rocCounts = data.counts || {};
+    const matched = Number(rocCounts.exact_matches || 0);
+    document.getElementById("rocPreview").hidden = false;
+    document.getElementById("rocPreview").innerHTML = `<div class="intelligence-counts roc-counts">
+      <div><strong>${Number(rocCounts.source_rows || 0).toLocaleString()}</strong><span>ROC license rows</span></div>
+      <div class="good"><strong>${matched.toLocaleString()}</strong><span>Exact CorridorIQ matches</span></div>
+      <div><strong>${Number(rocCounts.matched_companies || 0).toLocaleString()}</strong><span>Companies verified</span></div>
+      <div><strong>${Number(rocCounts.unmatched || 0).toLocaleString()}</strong><span>Not in CRM</span></div>
+      <div class="bad"><strong>${Number(rocCounts.ambiguous || 0).toLocaleString()}</strong><span>Held for review</span></div>
+    </div><p class="muted">${CIQ.esc(data.matching_policy || "Exact matches only.")}</p>`;
+    document.getElementById("rocImportBtn").disabled = matched < 1;
+    rocStatus(matched ? `${matched.toLocaleString()} license rows are ready to verify and reclassify.` : "No safe CorridorIQ matches were found.", matched ? "ok" : "err");
+  }
+
+  async function previewRoc() {
+    if (!rocB64) return;
+    const button = document.getElementById("rocPreviewBtn");
+    button.disabled = true; button.textContent = "Matching…";
+    rocStatus("Matching license numbers, legal names, DBAs, and aliases…", "info");
+    try { renderRocPreview(await CIQ.api.post("/api/admin/external-intelligence/roc-preview", { filename: rocName, content_base64: rocB64 })); }
+    catch (error) { rocStatus(error.message || "ROC preview failed.", "err"); }
+    finally { button.disabled = false; button.textContent = "1. Preview ROC matches"; }
+  }
+
+  async function importRoc() {
+    if (!rocCounts || !Number(rocCounts.exact_matches || 0)) return;
+    const approved = await CIQ.confirm(`Back up the database, verify ${Number(rocCounts.exact_matches).toLocaleString()} ROC license matches, and reclassify those companies?`, { confirmLabel: "Verify & reclassify" });
+    if (!approved) return;
+    const button = document.getElementById("rocImportBtn");
+    button.disabled = true; button.textContent = "Verifying…";
+    try {
+      const data = await CIQ.api.post("/api/admin/external-intelligence/roc-import", { filename: rocName, content_base64: rocB64 });
+      const c = data.counts || {};
+      rocStatus(`ROC import complete: ${Number(c.matched_companies || 0).toLocaleString()} companies verified; ${Number(c.created_rows || 0).toLocaleString()} evidence records created and ${Number(c.updated_rows || 0).toLocaleString()} updated. Backup: ${data.backup_file}`, "ok");
+      CIQ.toast("ROC verification complete", "success"); rocCounts = null; await loadCoverage();
+    } catch (error) { rocStatus(error.message || "ROC import failed.", "err"); button.disabled = false; }
+    finally { button.textContent = "2. Back up, verify & reclassify"; }
+  }
+
+  async function chooseRoc(event) {
+    const file = event.target.files[0]; rocName = rocB64 = rocCounts = null;
+    document.getElementById("rocPreview").hidden = true; document.getElementById("rocImportBtn").disabled = true;
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv") || file.size > 35 * 1024 * 1024) {
+      rocStatus("Choose the unedited Arizona ROC CSV, no larger than 35 MB.", "err"); event.target.value = ""; return;
+    }
+    try {
+      rocName = file.name; rocB64 = await readFile(file);
+      document.getElementById("rocFileMeta").textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+      document.getElementById("rocPreviewBtn").disabled = false;
+      rocStatus("Official file loaded. Preview exact matches before changing the database.", "ok");
+    } catch (error) { rocStatus(error.message, "err"); }
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const user = await CIQ.guard("admin.system", { title: "Intelligence Import", subtitle: "Source-backed company evidence", active: "intelligence-import.html" });
     if (!user) return;
     document.getElementById("downloadTemplateBtn").addEventListener("click", downloadTemplate);
+    document.getElementById("refreshSourcesBtn").addEventListener("click", refreshSources);
     document.getElementById("downloadQueueBtn").addEventListener("click", downloadResearchQueue);
     document.getElementById("intelligenceFile").addEventListener("change", chooseFile);
     document.getElementById("intelligencePreviewBtn").addEventListener("click", preview);
     document.getElementById("intelligenceImportBtn").addEventListener("click", applyImport);
+    document.getElementById("rocFile").addEventListener("change", chooseRoc);
+    document.getElementById("rocPreviewBtn").addEventListener("click", previewRoc);
+    document.getElementById("rocImportBtn").addEventListener("click", importRoc);
     await loadCoverage();
   });
 })();

@@ -36,12 +36,13 @@ from pipeline.reports import catalog as reports_catalog
 from pipeline import pipeline_runs
 from pipeline import contact_enrichment
 from pipeline import external_intelligence
+from pipeline import adot_intelligence
 from pipeline.db.database import get_connection, init_db
 
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-multisource-intelligence-r15"
+BUILD_ID = "2026-08-15-live-source-intelligence-r15.1"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -465,6 +466,20 @@ class ApiHandler(BaseHTTPRequestHandler):
         if method == "POST" and path == "/api/admin/external-intelligence/import":
             return self._json(200, external_intelligence.import_upload(
                 conn, user, body, ip=ip, ua=ua))
+        if method == "POST" and path == "/api/admin/external-intelligence/roc-preview":
+            return self._json(200, external_intelligence.preview_roc_upload(conn, user, body))
+        if method == "POST" and path == "/api/admin/external-intelligence/roc-import":
+            return self._json(200, external_intelligence.import_roc_upload(
+                conn, user, body, ip=ip, ua=ua))
+        if method == "POST" and path == "/api/admin/external-intelligence/refresh":
+            from pipeline.auth.rbac import require_permission
+            require_permission(user, "admin.system")
+            result = adot_intelligence.refresh(conn)
+            write_audit(conn, event_type="external_source_refresh", user_id=user["id"],
+                        organization_id=user["organization_id"], resource_type="adot_current_ads",
+                        resource_id="current", action="refresh", success=True, ip_address=ip,
+                        user_agent=ua, details=result)
+            return self._json(200, {"ok": True, "source": "adot", "counts": result})
 
         # --- products (Sprint 6) ---
         if method == "POST" and path == "/api/products/quote":

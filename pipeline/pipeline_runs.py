@@ -218,6 +218,9 @@ def run_morning_refresh(
     _stage("analysis", lambda: _run_incremental_analysis(conn, touched_ids))
 
     # 7. Company intelligence refresh (links + metrics + timeline + export).
+    external_stats = None
+    if settings.EXTERNAL_INTELLIGENCE_REFRESH_ENABLED:
+        external_stats = _stage("external_intelligence", lambda: _refresh_external_intelligence(conn))
     _stage("company_intelligence", lambda: _refresh_company_intelligence(conn))
 
     # 8-11. Work queues + dashboard/export refresh (submitted, issued, active,
@@ -258,6 +261,7 @@ def run_morning_refresh(
         "updated_projects": counts["updated_projects"],
         "estimator_ready": counts["estimator_ready"],
         "stage_seconds": stage_times,
+        "external_intelligence": external_stats,
         "jurisdictions": freshness,
         "errors": errors,
     }
@@ -311,6 +315,11 @@ def _refresh_company_intelligence(conn: sqlite3.Connection) -> None:
     compute_company_metrics(conn)
     rebuild_company_timeline(conn)
     export_companies(conn)
+
+
+def _refresh_external_intelligence(conn: sqlite3.Connection) -> dict:
+    from pipeline.adot_intelligence import refresh
+    return refresh(conn)
 
 
 def _refresh_exports(conn: sqlite3.Connection) -> None:

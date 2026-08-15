@@ -86,6 +86,7 @@ def conn(tmp_path, monkeypatch):
     # stage stays real so we can assert incremental scoring / lifecycle.
     monkeypatch.setattr(pipeline_runs, "_refresh_company_intelligence", lambda conn: None)
     monkeypatch.setattr(pipeline_runs, "_refresh_exports", lambda conn: None)
+    monkeypatch.setattr(settings, "EXTERNAL_INTELLIGENCE_REFRESH_ENABLED", False)
     # Redirect all output dirs into the tmp workspace.
     monkeypatch.setattr(settings, "DATA_EXPORTS_DIR", tmp_path / "exports")
     monkeypatch.setattr(settings, "REPORTS_GENERATED_DIR", tmp_path / "reports")
@@ -400,6 +401,7 @@ def http_server(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "DATA_EXPORTS_DIR", tmp_path / "exports")
     monkeypatch.setattr(settings, "REPORTS_GENERATED_DIR", tmp_path / "reports")
     monkeypatch.setattr(settings, "MORNING_REFRESH_LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr(settings, "EXTERNAL_INTELLIGENCE_REFRESH_ENABLED", False)
     srv = ThreadingHTTPServer(("127.0.0.1", 0), server_mod.ApiHandler)
     port = srv.server_address[1]
     t = threading.Thread(target=srv.serve_forever, daemon=True)

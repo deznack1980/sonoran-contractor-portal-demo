@@ -452,11 +452,12 @@ def test_admin_dashboard_exposes_live_build_and_data_provenance():
 
     assert 'id="verificationPanel"' in html
     assert "LIVE TEST PROOF" in script
-    assert "Release 15 Multi-Source Intelligence: ACTIVE" in script
+    assert "Release 15.1 Live Source Intelligence: ACTIVE" in script
     for field in ("build_id", "database_status", "public_permit_records",
                   "corridoriq_project_records", "imported_contact_records",
                   "external_evidence_records", "external_evidence_companies",
-                  "external_evidence_sources",
+                  "external_evidence_sources", "live_public_bids",
+                  "public_bid_planholders", "matched_public_planholders",
                   "crm_activity_records", "crm_relationship_records",
                   "jurisdiction_sources"):
         assert field in script
@@ -480,7 +481,7 @@ def test_external_intelligence_import_is_secure_allowlisted_and_source_backed():
     assert "UCC records are financing filings" in html
     for source in ("Arizona ROC", "Corporation Commission", "Arizona UCC", "ADOT advertisements"):
         assert source in html
-    for route in ("/api/admin/external-intelligence/coverage", "/api/admin/external-intelligence/research-queue", "/api/admin/external-intelligence/preview", "/api/admin/external-intelligence/import"):
+    for route in ("/api/admin/external-intelligence/coverage", "/api/admin/external-intelligence/research-queue", "/api/admin/external-intelligence/preview", "/api/admin/external-intelligence/import", "/api/admin/external-intelligence/refresh", "/api/admin/external-intelligence/roc-preview", "/api/admin/external-intelligence/roc-import"):
         assert route in script and route in server
     assert 'CIQ.guard("admin.system"' in script
     assert '"intelligence-import.html", "intelligence-import.js"' in server
@@ -489,6 +490,10 @@ def test_external_intelligence_import_is_secure_allowlisted_and_source_backed():
     assert "a valid http(s) source_url is required" in service
     assert "CREATE TABLE IF NOT EXISTS company_external_evidence" in schema
     assert "CREATE TABLE IF NOT EXISTS external_intelligence_imports" in schema
+    assert "CREATE TABLE IF NOT EXISTS public_bid_opportunities" in schema
+    assert "CREATE TABLE IF NOT EXISTS public_bid_planholders" in schema
+    assert "Refresh live ADOT data" in html
+    assert "Official ROC active-license CSV" in html
 
 
 def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
@@ -502,8 +507,8 @@ def test_lead_integrity_rollout_is_backed_up_and_build_ids_match():
     assert "nonverified_project_links" in rollout
     assert "replace_permit_events=True" in rollout
     assert "apply_lead_integrity.py\" --apply" in one_click
-    assert "2026-08-15-multisource-intelligence-r15" in launcher
-    assert 'BUILD_ID = "2026-08-15-multisource-intelligence-r15"' in server
+    assert "2026-08-15-live-source-intelligence-r15.1" in launcher
+    assert 'BUILD_ID = "2026-08-15-live-source-intelligence-r15.1"' in server
 
 
 # --------------------------------------------------------------------------
@@ -979,8 +984,8 @@ def test_company_executive_brief_browser_flow(http_server):
         proof = page.locator("#verificationPanel")
         proof.wait_for(state="visible")
         assert "LIVE TEST PROOF" in proof.inner_text()
-        assert "Release 15 Multi-Source Intelligence: ACTIVE" in proof.inner_text()
-        assert "2026-08-15-multisource-intelligence-r15" in proof.inner_text()
+        assert "Release 15.1 Live Source Intelligence: ACTIVE" in proof.inner_text()
+        assert "2026-08-15-live-source-intelligence-r15.1" in proof.inner_text()
         assert "External evidence" in proof.inner_text()
         assert "Municipal source" in proof.inner_text()
         assert "Entered in CRM" in proof.inner_text()

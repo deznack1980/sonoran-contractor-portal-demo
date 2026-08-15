@@ -505,3 +505,7 @@ details.data-details[open] > summary { border-bottom: 1px solid var(--border); }
 @media(max-width:650px){.intelligence-import-hero{align-items:flex-start;flex-direction:column;padding:20px}.source-coverage-grid,.evidence-source-grid,.intelligence-counts{grid-template-columns:1fr}.intelligence-import-actions{align-items:stretch;flex-direction:column}.intelligence-import-actions .btn{width:100%}}
 @media(max-width:520px){.brief-source-grid{grid-template-columns:1fr}}
 .source-external{background:#e9f2f6;color:#285f76}
+.source-signal-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.source-signal{font-size:11px;letter-spacing:.01em}
+.roc-import-card{margin-top:17px}.roc-import-head{align-items:flex-start;gap:24px;margin-bottom:16px}.roc-import-head>div{max-width:820px}.roc-import-head h2{font-size:19px;margin:4px 0 6px}.roc-import-head p{margin:0;color:var(--text-3);font-size:12.5px;line-height:1.5}.roc-counts{grid-template-columns:repeat(5,1fr)}
+@media(max-width:900px){.roc-counts{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.roc-import-head{align-items:flex-start;flex-direction:column}.roc-counts{grid-template-columns:1fr}}

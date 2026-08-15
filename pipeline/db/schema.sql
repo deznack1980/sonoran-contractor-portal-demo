@@ -599,6 +599,55 @@ CREATE TABLE IF NOT EXISTS external_intelligence_imports (
     created_at          TEXT NOT NULL
 );
 
+-- Current public procurement opportunities and their published planholders.
+-- Planholders are retained even when they cannot yet be matched to a canonical
+-- company, so no source record is lost or incorrectly forced onto a lead.
+CREATE TABLE IF NOT EXISTS public_bid_opportunities (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type         TEXT NOT NULL,
+    source_record_id    TEXT NOT NULL,
+    tracs_number        TEXT,
+    project_number      TEXT,
+    route_county_milepost TEXT,
+    bid_opening_date    TEXT,
+    plans_status        TEXT,
+    addendum_count      INTEGER,
+    type_of_work        TEXT,
+    source_url          TEXT NOT NULL,
+    planholders_url     TEXT,
+    retrieved_at        TEXT NOT NULL,
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(source_type, source_record_id)
+);
+CREATE INDEX IF NOT EXISTS idx_public_bid_opportunities_opening
+    ON public_bid_opportunities(source_type, bid_opening_date, is_active);
+
+CREATE TABLE IF NOT EXISTS public_bid_planholders (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id      INTEGER NOT NULL REFERENCES public_bid_opportunities(id),
+    company_id          INTEGER REFERENCES companies(id),
+    company_name        TEXT NOT NULL,
+    normalized_name     TEXT NOT NULL,
+    phone               TEXT,
+    fax                 TEXT,
+    address_line_1      TEXT,
+    city                TEXT,
+    state               TEXT,
+    postal_code         TEXT,
+    registered_date     TEXT,
+    source_url          TEXT NOT NULL,
+    retrieved_at        TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(opportunity_id, normalized_name)
+);
+CREATE INDEX IF NOT EXISTS idx_public_bid_planholders_company
+    ON public_bid_planholders(company_id, opportunity_id);
+CREATE INDEX IF NOT EXISTS idx_public_bid_planholders_name
+    ON public_bid_planholders(normalized_name);
+
 -- company_aliases: every source name variant preserved.
 CREATE TABLE IF NOT EXISTS company_aliases (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,

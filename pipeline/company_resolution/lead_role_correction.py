@@ -20,7 +20,7 @@ from pipeline.company_resolution.merge import create_company, enrich_company, en
 from pipeline.company_resolution.models import DECISION_NEW, DECISION_POSSIBLE, CompanyInput
 
 MIGRATION_KEY = "lead_role_explicit_evidence_v1"
-CLASSIFICATION_VERSION = "lead-role-v1"
+CLASSIFICATION_VERSION = "lead-role-v2-external-evidence"
 LEAD_TYPES = (
     "verified_contractor",
     "specifier_architect_engineer",
@@ -160,13 +160,15 @@ def _source_company_id(conn, item, prior_name, prior_company_id):
     return _company_for_name(conn, item["name"])
 
 
-def _classify_companies(conn: sqlite3.Connection, now: str) -> Counter:
+def _classify_companies(conn: sqlite3.Connection, now: str, company_ids: set[int] | None = None) -> Counter:
     counts = Counter()
     companies = conn.execute(
         "SELECT id, display_name, legal_name FROM companies WHERE lifecycle_state='active'"
     ).fetchall()
     for company in companies:
         cid = company["id"]
+        if company_ids is not None and cid not in company_ids:
+            continue
         evidence = conn.execute(
             "SELECT source_role,source_field,lead_type,verification_status,is_contractor_evidence "
             "FROM permit_party_evidence WHERE company_id=?", (cid,)
@@ -175,21 +177,34 @@ def _classify_companies(conn: sqlite3.Connection, now: str) -> Counter:
         ambiguous = sum(1 for e in evidence if not e["is_contractor_evidence"])
         roles = {r["role_type"] for r in conn.execute(
             "SELECT role_type FROM company_roles WHERE company_id=?", (cid,))}
+        external = conn.execute(
+            "SELECT source_type,evidence_type,title,status,summary,source_record_id "
+            "FROM company_external_evidence WHERE company_id=?", (cid,)).fetchall()
+        active_roc = [e for e in external if e["source_type"] == "az_roc"
+                      and e["evidence_type"] == "contractor_license"
+                      and str(e["status"] or "").casefold() in {"active", "current", "good standing"}]
+        external_specifier = [e for e in external if e["evidence_type"] in {
+            "architect_registration", "engineer_registration", "design_firm", "specifier_role"}
+            or _SPECIFIER.search(" ".join(str(e[k] or "") for k in ("title", "summary")))]
         name = _clean(company["display_name"] or company["legal_name"]) or "Company"
         fields = sorted({e["source_field"] for e in evidence})
-        if explicit:
+        if active_roc:
+            lead_type, verification, confidence = "verified_contractor", "verified", .98
+            why = f"Active Arizona ROC contractor license {active_roc[0]['source_record_id']}"
+        elif explicit:
             lead_type, verification, confidence = "verified_contractor", "verified", 1.0
             why = f"{explicit} permit(s) contain an explicit contractor or builder field"
-        elif roles & {"architect", "engineer"} or _SPECIFIER.search(name):
+        elif external_specifier or roles & {"architect", "engineer"} or _SPECIFIER.search(name):
             lead_type, verification, confidence = "specifier_architect_engineer", "role_inferred", .85
-            why = "Published role/name indicates architect, engineer, or design/specification influence"
+            why = "Published external or permit evidence indicates architect, engineer, or design/specification influence"
         elif roles & {"property_owner", "developer"} or _OWNER.search(name) or any(e["lead_type"] == "owner_developer" for e in evidence):
             lead_type, verification, confidence = "owner_developer", "role_inferred", .80
             why = "Published owner/developer evidence or company role indicates project ownership/development"
         else:
             lead_type, verification, confidence = "unverified_permit_contact", "unverified", .35
             why = "Permit party is retained for research but no explicit contractor evidence exists"
-        source = "permit_party_evidence" if evidence else "existing_crm_or_company_record"
+        source = "external_intelligence" if active_roc or external_specifier else (
+            "permit_party_evidence" if evidence else "existing_crm_or_company_record")
         source_field = ", ".join(fields[:8]) if fields else None
         conn.execute(
             """INSERT INTO company_lead_classification
@@ -229,6 +244,21 @@ def _classify_companies(conn: sqlite3.Connection, now: str) -> Counter:
             )
         counts[lead_type] += 1
     return counts
+
+
+def reclassify_companies_from_external_evidence(
+        conn: sqlite3.Connection, company_ids: list[int] | set[int], *, commit: bool = True) -> dict:
+    """Reclassify only companies touched by an external-evidence import."""
+    ids = {int(company_id) for company_id in company_ids}
+    if not ids:
+        return {}
+    now = _now()
+    if commit:
+        with conn:
+            counts = _classify_companies(conn, now, ids)
+    else:
+        counts = _classify_companies(conn, now, ids)
+    return dict(counts)
 
 
 def _deprecate_placeholder_companies(conn: sqlite3.Connection, now: str) -> int:

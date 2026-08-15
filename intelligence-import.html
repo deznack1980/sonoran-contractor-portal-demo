@@ -12,6 +12,7 @@
       <div><span class="eyebrow">MULTI-SOURCE EVIDENCE</span><h2>Load verified company intelligence.</h2>
         <p>Every imported fact requires a source URL, retrieval date, record identifier, match method, and confidence score.</p></div>
       <div class="row">
+        <button id="refreshSourcesBtn" class="btn btn-primary" type="button">Refresh live ADOT data</button>
         <button id="downloadQueueBtn" class="btn" type="button">Download research queue</button>
         <button id="downloadTemplateBtn" class="btn btn-dark" type="button">Download CSV template</button>
       </div>
@@ -53,6 +54,25 @@
         </div>
       </aside>
     </div>
+
+    <section class="card card-pad roc-import-card">
+      <div class="spread roc-import-head">
+        <div><span class="eyebrow">BULK CONTRACTOR VERIFICATION</span><h2>Match the official Arizona ROC license file.</h2>
+          <p>Upload the unedited Active Contractor Licenses CSV downloaded from Arizona ROC. CorridorIQ matches exact license numbers first, then exact legal names, DBAs, and aliases. Ambiguous rows are never forced.</p></div>
+        <a class="btn" href="https://roc.az.gov/contractor-search" target="_blank" rel="noopener">Open Arizona ROC</a>
+      </div>
+      <label class="intelligence-file-box" for="rocFile">
+        <strong>Official ROC active-license CSV</strong>
+        <span id="rocFileMeta">CSV only · maximum 35 MB · original agency format accepted</span>
+        <input id="rocFile" type="file" accept=".csv,text/csv" />
+      </label>
+      <div class="row intelligence-import-actions">
+        <button id="rocPreviewBtn" class="btn" type="button" disabled>1. Preview ROC matches</button>
+        <button id="rocImportBtn" class="btn btn-primary" type="button" disabled>2. Back up, verify &amp; reclassify</button>
+      </div>
+      <div id="rocStatus" aria-live="polite"></div>
+      <section id="rocPreview" class="intelligence-preview" hidden></section>
+    </section>
   </template>
   <script src="portal-common.js"></script>
   <script src="intelligence-import.js"></script>
