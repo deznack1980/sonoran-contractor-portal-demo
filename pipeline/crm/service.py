@@ -595,7 +595,6 @@ def list_my_companies(conn: sqlite3.Connection, user: dict, filters: dict | None
     if not has_permission(user, "companies.view"):
         where.append("r.assigned_user_id=?")
         params.append(user["id"])
-
     q = (filters.get("q") or "").strip()
     if q:
         where.append("(c.display_name LIKE ? OR c.city LIKE ?)")
@@ -908,12 +907,20 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     if not has_permission(user, "companies.view"):
         where.append("r.assigned_user_id=?")
         params.append(user["id"])
+    owner = (filters.get("owner") or "").strip().lower()
+    if owner == "mine":
+        where.append("r.assigned_user_id=?")
+        params.append(user["id"])
+    elif owner == "unassigned":
+        where.append("r.assigned_user_id IS NULL")
     q = (filters.get("q") or "").strip()
     if q:
         where.append("(c.display_name LIKE ? OR p.job_address LIKE ? OR p.jurisdiction LIKE ?)")
         params += [f"%{q}%", f"%{q}%", f"%{q}%"]
     lifecycle = (filters.get("lifecycle") or "").strip()
-    if lifecycle:
+    if lifecycle == "submitted":
+        where.append("pr.project_lifecycle IN ('Application Submitted','Plan Review')")
+    elif lifecycle:
         where.append("pr.project_lifecycle=?")
         params.append(lifecycle)
     smin = filters.get("score_min")
@@ -925,6 +932,10 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
         where.append(_CONTACT_INFO_SQL)
     elif contact_info == "missing":
         where.append("NOT " + _CONTACT_INFO_SQL)
+    active_only = str(filters.get("active_only") or "").strip().lower()
+    if active_only in {"1", "true", "yes"}:
+        where.append("r.relationship_status NOT IN ('lost','do_not_contact','inactive')")
+        where.append("COALESCE(r.do_not_contact,0)=0")
     age_days = filters.get("age_days")
     if age_days not in (None, ""):
         try:
@@ -952,6 +963,8 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
     rows = conn.execute(
         f"""
         SELECT pr.id AS project_id, r.company_id, c.display_name,
+               r.relationship_status, r.assigned_user_id,
+               u.display_name AS assigned_to,
                COALESCE(r.lead_type,c.lead_type,'unverified_permit_contact') AS lead_type,
                COALESCE(r.lead_verification_status,c.lead_verification_status,'unverified') AS lead_verification_status,
                COALESCE(r.lead_classification_source,c.lead_source) AS lead_source,
@@ -961,6 +974,19 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
                pr.project_category, pr.project_lifecycle,
                pr.opportunity_score, pr.opportunity_date, pr.opportunity_timing,
                pr.estimated_material_value,
+               (SELECT COUNT(*) FROM material_lists ml
+                WHERE ml.organization_id=r.organization_id AND ml.project_id=pr.id)
+                   AS material_list_count,
+               (SELECT ml.status FROM material_lists ml
+                WHERE ml.organization_id=r.organization_id AND ml.project_id=pr.id
+                ORDER BY ml.updated_at DESC, ml.id DESC LIMIT 1)
+                   AS latest_material_list_status,
+               (SELECT COUNT(*)
+                FROM supplier_quote_requests sqr
+                JOIN material_lists ml ON ml.id=sqr.material_list_id
+                WHERE sqr.organization_id=r.organization_id AND ml.project_id=pr.id
+                  AND sqr.status IN ('prepared','sent','responded','awarded'))
+                   AS quote_request_count,
                (SELECT COUNT(*) FROM permits pp WHERE pp.contractor_company_id=c.id) AS company_permit_count,
                CASE WHEN {_CONTACT_INFO_SQL}
                     THEN 1 ELSE 0 END AS has_contact_info
@@ -968,6 +994,7 @@ def opportunities(conn: sqlite3.Connection, user: dict, filters: dict | None = N
         JOIN companies c ON c.id=r.company_id
         JOIN projects pr ON pr.contractor_company_id=c.id
         JOIN permits p ON p.id=pr.permit_id
+        LEFT JOIN users u ON u.id=r.assigned_user_id
         WHERE {where_sql}
         ORDER BY has_contact_info DESC,
                  COALESCE(pr.opportunity_score,0) DESC,

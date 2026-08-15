@@ -3,10 +3,10 @@
   let data = null;
 
   const PRIMARY_KPIS = [
-    ["new_submitted_opportunities", "New submitted today", "◎", "opportunity-board.html", "good", "Fresh permit applications worth reviewing"],
-    ["new_issued_permits", "New permits issued", "✓", "opportunity-board.html", "good", "Projects moving into purchasing windows"],
-    ["high_priority_opportunities", "High-priority targets", "⚡", "opportunity-board.html", "warn", "Best active revenue opportunities"],
-    ["companies_awaiting_assignment", "Need an owner", "⇄", "assignments.html", "warn", "Companies waiting for sales follow-up"],
+    ["new_submitted_opportunities", "New submitted today", "◎", "opportunities.html?lifecycle=submitted&age_days=1", "good", "Fresh permit applications worth reviewing"],
+    ["new_issued_permits", "New permits issued", "✓", "opportunities.html?lifecycle=Permit%20Issued&age_days=1", "good", "Projects moving into purchasing windows"],
+    ["high_priority_opportunities", "High-priority targets", "⚡", "opportunity-board.html?score_min=80", "warn", "Best active revenue opportunities"],
+    ["contact_ready_contractors", "Ready to contact", "☎", "my-companies.html?view=contact", "good", "Verified contractors with a reachable contact channel"],
   ];
 
   const SECONDARY_KPIS = [
@@ -17,6 +17,8 @@
     ["estimates_approved_for_supplier", "Material lines", "⬡", "product-search.html"],
     ["active_employees", "Active users", "⦿", "user-management.html"],
     ["overdue_team_tasks", "Overdue tasks", "⚠", "team-dashboard.html"],
+    ["contractors_needing_enrichment", "Need contact research", "⌕", "my-companies.html?view=enrichment"],
+    ["companies_awaiting_assignment", "Need assignment", "⇄", "assignments.html"],
   ];
 
   const ACTIONS = [
@@ -37,6 +39,7 @@
       new_issued_permits: "No new issued permits today",
       high_priority_opportunities: "No high-priority opportunities",
       companies_awaiting_assignment: "No unassigned companies",
+      contact_ready_contractors: "No verified contractors have contact information yet",
       estimates_awaiting_review: "No estimates awaiting review",
       overdue_team_tasks: "No overdue team tasks",
     };

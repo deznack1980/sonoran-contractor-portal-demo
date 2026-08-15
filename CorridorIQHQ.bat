@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 set "PORT=8780"
-set "BUILD=2026-08-15-lead-integrity-r11"
+set "BUILD=2026-08-15-crm-stabilization-r13"
 set "URL=http://127.0.0.1:%PORT%/login.html?build=%BUILD%"
 
 REM Prefer the Windows py launcher, then python.
@@ -61,4 +61,3 @@ if /I not "%PORTAL_STATE%"=="current" (
 
 start "" "%URL%"
 endlocal
-

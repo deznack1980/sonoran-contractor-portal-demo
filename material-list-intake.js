@@ -12,9 +12,29 @@
   let quoteRequests = [];
   let catalogPopup = null, catalogInput = null, catalogRow = null;
   let catalogItems = [], catalogIndex = -1, catalogRequest = 0;
+  let dirty = false, autosaveTimer = null;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => CIQ.esc(value == null ? "" : value);
+
+  function setDraftSaveState(message) {
+    const el = $("draftSaveState");
+    if (el) el.textContent = message;
+  }
+
+  function persistLocalDraft(message) {
+    if (!$("companyName")) return;
+    localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+    dirty = false;
+    setDraftSaveState(message || "Saved on this device");
+  }
+
+  function scheduleLocalSave() {
+    dirty = true;
+    setDraftSaveState("Saving…");
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => persistLocalDraft(), 350);
+  }
 
   function id() {
     return (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() :
@@ -91,7 +111,7 @@
     catalogRow.unit = item.unit_of_measure || "each"; catalogRow.manufacturer = item.manufacturer || "";
     catalogRow.supplierPrice = item.supplier_price; catalogRow.quantityAvailable = item.quantity_available;
     catalogRow.leadTimeDays = item.lead_time_days;
-    closeCatalogPopup(); render();
+    closeCatalogPopup(); render(); scheduleLocalSave();
   }
 
   function readForm() {
@@ -134,6 +154,8 @@
     $("fileName").textContent = sourceName;
     $("fileName").style.display = sourceName ? "inline-block" : "none";
     render();
+    dirty = false;
+    setDraftSaveState("Saved on this device");
   }
 
   function render() {
@@ -160,6 +182,7 @@
           scheduleCatalogSearch(input, row);
         }
         renderCounts();
+        scheduleLocalSave();
       });
       input.addEventListener("keydown", (event) => {
         if (input.dataset.field === "description" && catalogInput === input && catalogPopup && !catalogPopup.hidden) {
@@ -178,6 +201,7 @@
         if (input.dataset.field === "description") {
           if (rowIndex === rows.length - 1) rows.push(blankRow());
           render();
+          scheduleLocalSave();
           setTimeout(() => {
             const descriptions = $("bomBody").querySelectorAll('input[data-field="description"]');
             const next = descriptions[Math.min(rowIndex + 1, descriptions.length - 1)];
@@ -194,6 +218,7 @@
       select.addEventListener("change", () => {
         const row = rows.find((r) => r.id === select.closest("tr").dataset.id);
         row.allowSubstitution = select.value === "true";
+        scheduleLocalSave();
       });
     });
     $("bomBody").querySelectorAll("[data-remove]").forEach((button) => {
@@ -201,6 +226,7 @@
         rows = rows.filter((r) => r.id !== button.closest("tr").dataset.id);
         if (!rows.length) rows.push(blankRow());
         render();
+        scheduleLocalSave();
       });
     });
   }
@@ -247,12 +273,16 @@
     status = "Draft";
     const payload = readForm();
     localStorage.setItem(storageKey(), JSON.stringify(payload));
+    dirty = false;
+    clearTimeout(autosaveTimer);
+    setDraftSaveState("Saved on this device");
     $("bomStatus").textContent = status;
     if (payload.companyId) {
       try {
         const result = await CIQ.api.post("/api/material-lists", payload);
         materialListId = result.item.id;
         localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+        setDraftSaveState("Saved to CorridorIQ");
         if (showToast) CIQ.toast("Draft saved to CorridorIQ", "success");
         return;
       } catch (error) {
@@ -289,7 +319,7 @@
     const file = $("sourceFile").files[0];
     if (!file) { CIQ.toast("Choose a source file first", "error"); return; }
     if (!/\.csv$/i.test(file.name)) {
-      $("intakeStatus").innerHTML = CIQ.errorBanner("For launch, automatic parsing supports CSV. Add PDF, Excel, and photo items manually.");
+      $("intakeStatus").innerHTML = CIQ.errorBanner("Automatic import requires a CSV file.");
       return;
     }
     const lines = (await file.text()).split(/\r?\n/).filter((line) => line.trim());
@@ -311,6 +341,7 @@
     status = "Draft";
     $("intakeStatus").innerHTML = '<div class="badge blue">' + rows.length + " CSV items loaded</div>";
     render();
+    scheduleLocalSave();
   }
 
   function submitForReview() {
@@ -318,10 +349,14 @@
     if (error) { CIQ.toast(error, "error"); return; }
     status = "Ready for review";
     localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+    dirty = false;
+    clearTimeout(autosaveTimer);
+    setDraftSaveState("Saved on this device");
     $("bomStatus").textContent = status;
     CIQ.api.post("/api/material-lists", readForm()).then((result) => {
       materialListId = result.item.id;
       localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+      setDraftSaveState("Saved to CorridorIQ");
       CIQ.toast("Material list submitted for review", "success");
     }).catch((error) => CIQ.toast("Saved locally; review submission failed: " + error.message, "info"));
   }
@@ -345,10 +380,14 @@
       (unmatched.length ? '<div class="freshness-banner attention" style="margin-top:12px"><span class="freshness-pulse"></span><div><strong>Manual review required</strong><span>Match the highlighted items to Sonoran products before sending pricing.</span></div></div>' : "");
     const pricedPayload = readForm();
     localStorage.setItem(storageKey(), JSON.stringify(pricedPayload));
+    dirty = false;
+    clearTimeout(autosaveTimer);
+    setDraftSaveState("Saved on this device");
     if (pricedPayload.companyId) {
       CIQ.api.post("/api/material-lists", pricedPayload).then((result) => {
         materialListId = result.item.id;
         localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+        setDraftSaveState("Saved to CorridorIQ");
       }).catch((error) => {
         CIQ.toast("Pricing is visible, but the server save failed: " + error.message, "info");
       });
@@ -514,6 +553,9 @@
       const saved = await CIQ.api.post("/api/material-lists", readForm());
       materialListId = saved.item.id;
       localStorage.setItem(storageKey(), JSON.stringify(readForm()));
+      dirty = false;
+      clearTimeout(autosaveTimer);
+      setDraftSaveState("Saved to CorridorIQ");
       const prepared = await CIQ.api.post("/api/material-lists/" + materialListId + "/quote-requests", {
         supplier_id: supplierId,
         quote_needed_by: $("quoteNeededBy").value || null,
@@ -626,6 +668,7 @@
     const loadedServerDraft = await loadServerDraft(draft);
     if (!loadedServerDraft) await prefillContext();
     if (!$("quoteNeededBy").value) $("quoteNeededBy").value = dateFromToday(2);
+    persistLocalDraft();
     await loadRfqWorkspace();
     if (cartDraft) CIQ.toast("Cart items loaded into the material list", "success");
 
@@ -634,6 +677,7 @@
       sourceName = file ? file.name : "";
       $("fileName").textContent = sourceName;
       $("fileName").style.display = sourceName ? "inline-block" : "none";
+      scheduleLocalSave();
     });
     $("dropZone").addEventListener("dragover", (e) => e.preventDefault());
     $("dropZone").addEventListener("drop", (e) => {
@@ -643,7 +687,12 @@
         $("sourceFile").dispatchEvent(new Event("change"));
       }
     });
-    $("addRowBtn").addEventListener("click", () => { rows.push(blankRow()); render(); });
+    ["companyName", "projectName", "jobsitePostalCode", "neededBy", "quoteNeededBy",
+     "deliveryPreference", "requestNotes"].forEach((fieldId) => {
+      const field = $(fieldId);
+      field.addEventListener(field.tagName === "SELECT" ? "change" : "input", scheduleLocalSave);
+    });
+    $("addRowBtn").addEventListener("click", () => { rows.push(blankRow()); render(); scheduleLocalSave(); });
     $("saveDraftBtn").addEventListener("click", () => saveDraft(true));
     $("parseBtn").addEventListener("click", parseSource);
     $("requestReviewBtn").addEventListener("click", submitForReview);
@@ -663,6 +712,6 @@
       await saveDraft(false);
       CIQ.toast("Material list cleared", "success");
     });
-    CIQ.guardUnsaved(() => false);
+    CIQ.guardUnsaved(() => dirty);
   });
 })();
