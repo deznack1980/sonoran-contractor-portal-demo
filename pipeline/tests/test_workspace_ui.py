@@ -984,8 +984,9 @@ def test_opportunity_board_browser_flow_uses_real_crm_state(http_server):
         assert "UI Quote Plumbing" in card.inner_text()
         assert "Contact ready" in card.inner_text()
         assert "Assigned" in card.inner_text()
-        assert "Estimated material opportunity" in card.inner_text()
-        assert "Commercial Fixtures, Backflow, Valves" in card.inner_text()
+        commercial = card.locator(".pipeline-commercial").inner_text()
+        assert "estimated material opportunity" in commercial.lower()
+        assert "Commercial Fixtures, Backflow, Valves" in commercial
         assert page.get_by_role("link", name="Build Material List").is_visible()
         card.locator("select[data-status-company]").select_option("qualified")
         page.wait_for_selector('.op-card[data-stage="qualified"]', timeout=8000)
