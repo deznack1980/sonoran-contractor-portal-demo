@@ -12,6 +12,7 @@ from pipeline.auth.rbac import AuthzError, can_access_company, has_permission, r
 from pipeline.auth.service import write_audit
 from pipeline.company_resolution import queries as ci_queries
 from pipeline.crm import serializers
+from pipeline import external_intelligence
 
 RELATIONSHIP_STATUSES = {
     "new", "assigned", "researching", "attempted_contact", "contacted",
@@ -92,6 +93,8 @@ def get_company_detail(conn: sqlite3.Connection, user: dict, company_id: int,
         "contacts": base["contacts"],
         "data_quality": base["data_quality"],
         "relationship": serializers.serialize_relationship(rel) if rel else None,
+        "external_evidence": external_intelligence.evidence_for_company(conn, company_id),
+        "source_coverage": external_intelligence.coverage_for_company(conn, company_id),
     }
 
 

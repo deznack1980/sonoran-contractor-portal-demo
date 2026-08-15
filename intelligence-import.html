@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CorridorIQ — Intelligence Import</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <template id="pageContent">
+    <section class="intelligence-import-hero">
+      <div><span class="eyebrow">MULTI-SOURCE EVIDENCE</span><h2>Load verified company intelligence.</h2>
+        <p>Every imported fact requires a source URL, retrieval date, record identifier, match method, and confidence score.</p></div>
+      <div class="row">
+        <button id="downloadQueueBtn" class="btn" type="button">Download research queue</button>
+        <button id="downloadTemplateBtn" class="btn btn-dark" type="button">Download CSV template</button>
+      </div>
+    </section>
+
+    <div id="sourceCoverage" class="source-coverage-grid"></div>
+
+    <div class="intelligence-import-grid">
+      <section class="card card-pad">
+        <div class="section-title" style="margin-top:0">Preview and import</div>
+        <label class="intelligence-file-box" for="intelligenceFile">
+          <strong>External intelligence CSV</strong>
+          <span id="intelligenceFileMeta">CSV only · maximum 8 MB · up to 10,000 evidence rows</span>
+          <input id="intelligenceFile" type="file" accept=".csv,text/csv" />
+        </label>
+        <div class="row intelligence-import-actions">
+          <button id="intelligencePreviewBtn" class="btn" type="button" disabled>1. Preview validation</button>
+          <button id="intelligenceImportBtn" class="btn btn-primary" type="button" disabled>2. Back up &amp; import</button>
+        </div>
+        <div id="intelligenceStatus" aria-live="polite"></div>
+        <section id="intelligencePreview" class="intelligence-preview" hidden></section>
+      </section>
+
+      <aside class="card card-pad">
+        <div class="section-title" style="margin-top:0">Evidence rules</div>
+        <ul class="intelligence-rules">
+          <li>Company ID and company name must match CorridorIQ.</li>
+          <li>Source URLs must be valid HTTP or HTTPS records.</li>
+          <li>Confidence must be explicit from 0–100.</li>
+          <li>Duplicate source records are updated, not multiplied.</li>
+          <li>The complete SQLite database is backed up before import.</li>
+          <li>UCC records are financing filings—not automatic distress signals.</li>
+        </ul>
+        <div class="source-registry">
+          <a href="https://roc.az.gov/contractor-search" target="_blank" rel="noopener">Arizona ROC</a>
+          <a href="https://arizonabusinesscenter.azcc.gov/businesssearch" target="_blank" rel="noopener">Corporation Commission</a>
+          <a href="https://azsos.gov/business/ucc" target="_blank" rel="noopener">Arizona UCC</a>
+          <a href="https://cnsads.azdot.gov/current" target="_blank" rel="noopener">ADOT advertisements</a>
+        </div>
+      </aside>
+    </div>
+  </template>
+  <script src="portal-common.js"></script>
+  <script src="intelligence-import.js"></script>
+</body>
+</html>

@@ -73,6 +73,9 @@
       ["Direct email", primary && primary.email],
       ["Company phone", c.main_phone], ["Company email", c.main_email],
       ["Website", c.website], ["Business address", address], ["License", c.license_number],
+      ["License status", c.license_status], ["Company type", c.company_type_primary],
+      ["Year established", c.year_established], ["Employee range", c.employee_range],
+      ["Revenue range", c.revenue_range],
     ];
     return `<div class="brief-facts">${rows.map(([k, v]) => `<div><span>${esc(k)}</span><strong>${value(v)}</strong></div>`).join("")}</div>`;
   }
@@ -89,6 +92,28 @@
     return `<div class="table-wrap"><table class="tbl brief-table"><thead><tr><th>Permit</th><th>Status</th><th>Description</th><th>Filed / issued</th><th>Valuation</th></tr></thead><tbody>` +
       permits.slice(0, 10).map((p) => `<tr><td><strong>${value(p.permit_number)}</strong><small>${value(p.jurisdiction)}</small></td><td>${value(p.status)}</td><td>${value(p.description || p.permit_type)}</td><td>${date(p.filed_date)}<small>Issued ${date(p.issued_date)}</small></td><td>${money(p.valuation)}</td></tr>`).join("") +
       `</tbody></table></div>`;
+  }
+
+  function externalEvidenceBlock() {
+    const evidence = detail.external_evidence || [];
+    const coreTypes = ["az_roc", "azcc", "az_ucc", "adot"];
+    const coverage = (detail.source_coverage || []).filter((item) => coreTypes.includes(item.source_type));
+    const coverageHtml = coverage.map((item) => `<div class="brief-source ${item.status === "available" ? "available" : "missing"}">
+      <span>${esc(item.label || title(item.source_type))}</span>
+      <strong>${item.status === "available" ? `${Number(item.record_count || 0)} verified record${Number(item.record_count || 0) === 1 ? "" : "s"}` : "Not researched"}</strong>
+      <small>${item.last_retrieved ? `Retrieved ${date(item.last_retrieved)}` : "No verified record loaded"}</small>
+    </div>`).join("");
+    const rows = evidence.map((item) => `<tr>
+      <td><strong>${esc(item.source_agency)}</strong><small>${esc(item.source_record_id)}</small></td>
+      <td><strong>${esc(item.title)}</strong><small>${esc(item.summary || item.evidence_type || "—")}</small></td>
+      <td>${value(item.status)}</td><td>${date(item.effective_date)}</td>
+      <td>${Math.round(Number(item.confidence || 0))}%<small>${esc(title(item.match_method))}</small></td>
+      <td><a href="${esc(item.source_url)}" target="_blank" rel="noopener">Open source</a></td>
+    </tr>`).join("");
+    return `<div class="brief-source-grid">${coverageHtml}</div>` + (rows
+      ? `<div class="table-wrap"><table class="tbl brief-table brief-evidence-table"><thead><tr><th>Source</th><th>Evidence</th><th>Status</th><th>Date</th><th>Match</th><th>Record</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div class="brief-empty">No external source evidence has been loaded for this company. “Not researched” does not mean no public record exists.</div>') +
+      '<p class="brief-source-note"><strong>UCC context:</strong> A UCC filing documents a financing record. It is not, by itself, evidence of distress, credit quality, or payment risk.</p>';
   }
 
   function engagementBlock() {
@@ -148,11 +173,12 @@
     </section>
     <section class="brief-section"><h2>Executive summary</h2><p class="brief-lead">${esc(summaryText())}</p><div class="brief-objective"><span>Recommended call objective</span><strong>${esc(recommendedObjective())}</strong></div></section>
     <section class="brief-section"><h2>Who to contact</h2>${contactBlock()}</section>
+    <section class="brief-section"><div class="brief-section-head"><h2>External intelligence and source coverage</h2><span>${(detail.external_evidence || []).length} verified records</span></div>${externalEvidenceBlock()}</section>
     <section class="brief-section"><div class="brief-section-head"><h2>Project opportunity pipeline</h2><span>${projects.length} linked</span></div>${pipelineTable()}</section>
     <section class="brief-section"><div class="brief-section-head"><h2>Permit evidence</h2><span>${permits.length} records</span></div>${permitTable()}</section>
     <div class="brief-two-col"><section class="brief-section"><h2>Relationship position</h2>${engagementBlock()}</section><section class="brief-section"><h2>Risks and data gaps</h2>${riskList()}</section></div>
     <section class="brief-section"><h2>Next best actions</h2>${actionsList()}</section>
-    <footer class="executive-brief-foot"><strong>Evidence standard</strong><span>This brief uses authenticated CorridorIQ CRM, company, project, and permit records. Missing information is shown as unavailable and is not inferred. Verify source data before committing pricing, credit, or delivery capacity.</span></footer>`;
+    <footer class="executive-brief-foot"><strong>Evidence standard</strong><span>This brief uses authenticated CorridorIQ CRM, company, project, permit, and traceable external evidence records. Missing information is shown as unavailable and is not inferred. Verify source records before committing pricing, credit, or delivery capacity.</span></footer>`;
     brief.hidden = false;
   }
 
@@ -164,7 +190,7 @@
       `CRM STAGE: ${title(r.relationship_status || "new")}`,
       `PRIORITY: ${ci.company_priority_tier || "—"} (${ci.company_priority_score == null ? "—" : Math.round(Number(ci.company_priority_score))})`,
       `CONTACT: ${primary ? [primary.full_name, primary.job_title, primary.phone || primary.mobile_phone, primary.email].filter(Boolean).join(" · ") : c.main_phone || c.main_email || "Enrichment required"}`,
-      `PROJECTS: ${projects.length} · PERMITS: ${permits.length}`, "",
+      `PROJECTS: ${projects.length} · PERMITS: ${permits.length} · EXTERNAL EVIDENCE: ${(detail.external_evidence || []).length}`, "",
       "Evidence-based brief. Missing information is not inferred."].join("\n");
   }
 

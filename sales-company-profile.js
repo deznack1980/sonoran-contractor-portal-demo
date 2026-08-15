@@ -73,6 +73,11 @@
       ["Website", c.website, /^https?:/i.test(c.website || "") ? "" : "https://"],
       ["Address", address, ""],
       ["License", c.license_number, ""],
+      ["License status", c.license_status, ""],
+      ["Company type", c.company_type_primary, ""],
+      ["Year established", c.year_established, ""],
+      ["Employee range", c.employee_range, ""],
+      ["Revenue range", c.revenue_range, ""],
     ].filter((row) => row[1]);
     const actionableContact = Boolean(
       c.main_phone || c.main_email || c.website ||
@@ -141,6 +146,37 @@
         ${ci.activity_trend ? `<div class="muted" style="margin-top:12px;font-size:13px">Activity trend: <b>${CIQ.esc(CIQ.titleCase(ci.activity_trend))}</b></div>` : ""}
       </div>
     </div>`;
+  }
+
+  function externalIntelligenceSection() {
+    const evidence = detail.external_evidence || [];
+    const coreTypes = ["az_roc", "azcc", "az_ucc", "adot"];
+    const coverage = (detail.source_coverage || []).filter((item) => coreTypes.includes(item.source_type));
+    const label = (item) => item.label || CIQ.titleCase((item.source_type || "source").replaceAll("_", " "));
+    const coverageCards = coverage.map((item) => `<article class="evidence-source-card ${item.status === "available" ? "available" : "missing"}">
+      <div><span>${CIQ.esc(item.category || "Public evidence")}</span><strong>${CIQ.esc(label(item))}</strong></div>
+      <span class="badge ${item.status === "available" ? "green" : "slate"}">${item.status === "available" ? `${Number(item.record_count || 0)} record${Number(item.record_count || 0) === 1 ? "" : "s"}` : "Not researched"}</span>
+      <small>${item.last_retrieved ? `Retrieved ${CIQ.fmtDate(item.last_retrieved)}` : "No verified source record loaded"}</small>
+    </article>`).join("");
+    const rows = evidence.map((item) => `<tr>
+      <td data-label="Source"><strong>${CIQ.esc(item.source_agency)}</strong><small>${CIQ.esc(item.source_record_id)}</small></td>
+      <td data-label="Evidence"><strong>${CIQ.esc(item.title)}</strong><small>${CIQ.esc(item.summary || item.evidence_type || "—")}</small></td>
+      <td data-label="Status">${CIQ.esc(item.status || "—")}</td>
+      <td data-label="Date">${item.effective_date ? CIQ.fmtDate(item.effective_date) : "—"}</td>
+      <td data-label="Confidence">${Math.round(Number(item.confidence || 0))}%<small>${CIQ.esc(CIQ.titleCase((item.match_method || "").replaceAll("_", " ")))}</small></td>
+      <td data-label="Source record"><a class="btn btn-sm" href="${CIQ.esc(item.source_url)}" target="_blank" rel="noopener">Open source</a></td>
+    </tr>`).join("");
+    return `<div class="section-title">External intelligence <span class="badge slate">Source-backed</span></div>
+      <section class="card external-intelligence-card">
+        <div class="card-head"><div><h2>Official and researched evidence</h2><p>License, entity, financing-filing, and public-contract records tied to this company.</p></div>
+          <span class="badge ${evidence.length ? "green" : "amber"}">${evidence.length ? `${evidence.length} verified record${evidence.length === 1 ? "" : "s"}` : "Research needed"}</span></div>
+        <div class="card-pad">
+          <div class="evidence-source-grid">${coverageCards || '<div class="muted">Source coverage is unavailable.</div>'}</div>
+          ${rows ? `<div class="table-wrap evidence-table-wrap"><table class="tbl responsive evidence-table"><thead><tr><th>Source</th><th>Evidence</th><th>Status</th><th>Date</th><th>Confidence</th><th>Record</th></tr></thead><tbody>${rows}</tbody></table></div>`
+            : '<div class="evidence-empty"><strong>No external evidence has been loaded for this company.</strong><p>“Not researched” means CorridorIQ has not received a verified source record; it does not mean the record does not exist.</p></div>'}
+          <p class="evidence-disclaimer"><strong>UCC interpretation:</strong> A UCC row records a financing filing only. CorridorIQ does not infer financial distress, credit quality, or payment risk from that filing.</p>
+        </div>
+      </section>`;
   }
 
   function projectCard(p) {
@@ -222,7 +258,7 @@
     const root = document.getElementById("root");
     root.innerHTML = header() + contactSection()
       + `<div class="two-col" style="margin-top:18px">${crmSection()}${intelSection()}</div>`
-      + oppsSection() + timelineSection() + dataDetails();
+      + externalIntelligenceSection() + oppsSection() + timelineSection() + dataDetails();
     wireActions();
   }
 

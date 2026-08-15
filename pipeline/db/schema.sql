@@ -556,6 +556,49 @@ CREATE TABLE IF NOT EXISTS contacts (
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company_id);
 
+-- company_external_evidence: source-backed facts from official or researched
+-- systems. Every row remains traceable to a URL, retrieval time, record ID,
+-- match method, and confidence score. Narrative analysis is never stored here.
+CREATE TABLE IF NOT EXISTS company_external_evidence (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id          INTEGER NOT NULL REFERENCES companies(id),
+    source_type         TEXT NOT NULL,
+    source_agency       TEXT NOT NULL,
+    evidence_type       TEXT NOT NULL,
+    source_record_id    TEXT NOT NULL,
+    title               TEXT NOT NULL,
+    status              TEXT,
+    summary             TEXT,
+    amount              REAL,
+    effective_date      TEXT,
+    expiration_date     TEXT,
+    source_url          TEXT NOT NULL,
+    retrieved_at        TEXT NOT NULL,
+    confidence          REAL NOT NULL,
+    match_method        TEXT NOT NULL,
+    details_json        TEXT,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(company_id, source_type, evidence_type, source_record_id)
+);
+CREATE INDEX IF NOT EXISTS idx_external_evidence_company
+    ON company_external_evidence(company_id, source_type, effective_date DESC);
+CREATE INDEX IF NOT EXISTS idx_external_evidence_source
+    ON company_external_evidence(source_type, source_record_id);
+
+CREATE TABLE IF NOT EXISTS external_intelligence_imports (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id     INTEGER NOT NULL REFERENCES organizations(id),
+    filename            TEXT NOT NULL,
+    imported_by         INTEGER NOT NULL REFERENCES users(id),
+    input_rows          INTEGER NOT NULL,
+    imported_rows       INTEGER NOT NULL,
+    created_rows        INTEGER NOT NULL,
+    updated_rows        INTEGER NOT NULL,
+    backup_filename     TEXT NOT NULL,
+    created_at          TEXT NOT NULL
+);
+
 -- company_aliases: every source name variant preserved.
 CREATE TABLE IF NOT EXISTS company_aliases (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1055,4 +1098,3 @@ CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_org_status
     ON supplier_quote_requests(organization_id, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_supplier_quote_requests_list
     ON supplier_quote_requests(material_list_id, updated_at DESC);
-

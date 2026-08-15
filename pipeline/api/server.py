@@ -35,12 +35,13 @@ from pipeline.material_lists import service as material_lists
 from pipeline.reports import catalog as reports_catalog
 from pipeline import pipeline_runs
 from pipeline import contact_enrichment
+from pipeline import external_intelligence
 from pipeline.db.database import get_connection, init_db
 
 HOST = "127.0.0.1"
 PORT = settings.SALES_API_PORT
 COOKIE = settings.SESSION_COOKIE_NAME
-BUILD_ID = "2026-08-15-company-brief-r14"
+BUILD_ID = "2026-08-15-multisource-intelligence-r15"
 
 # Explicit same-origin portal allowlist. Legacy or unregistered pages stay private.
 _PORTAL_PAGES = {
@@ -65,6 +66,7 @@ _PORTAL_PAGES = {
     "portal-common.js",
     # Admin contact enrichment workflow.
     "contact-enrichment-admin.html", "contact-enrichment-admin.js",
+    "intelligence-import.html", "intelligence-import.js",
 }
 
 _ID = r"(\d+)"
@@ -291,6 +293,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             dashboard = crm_admin.admin_dashboard(conn, user)
             dashboard.setdefault("data_verification", {})["build_id"] = BUILD_ID
             dashboard["data_verification"]["executive_briefs"] = "active"
+            dashboard["data_verification"]["external_intelligence"] = "active"
             return self._json(200, dashboard)
         if path == "/api/estimator/work-queue":
             return self._json(200, crm_admin.estimator_work_queue(conn, user))
@@ -312,6 +315,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self._json(200, {"items": crm.list_assignments(conn, user)})
         if path == "/api/admin/users":
             return self._json(200, {"items": crm_admin.list_users(conn, user)})
+        if path == "/api/admin/external-intelligence/coverage":
+            from pipeline.auth.rbac import require_permission
+            require_permission(user, "admin.system")
+            return self._json(200, external_intelligence.organization_coverage(
+                conn, user["organization_id"]))
+        if path == "/api/admin/external-intelligence/research-queue":
+            from pipeline.auth.rbac import require_permission
+            require_permission(user, "admin.system")
+            return self._json(200, external_intelligence.research_queue(
+                conn, user["organization_id"], limit=query.get("limit", 500)))
 
         # --- data pipeline / morning refresh status ---
         if path == "/api/status/refresh":
@@ -447,6 +460,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         if method == "POST" and path == "/api/admin/contact-enrichment/import":
             return self._json(200, contact_enrichment.import_upload(
                 conn, user, body, ip=ip, ua=ua))
+        if method == "POST" and path == "/api/admin/external-intelligence/preview":
+            return self._json(200, external_intelligence.preview_upload(conn, user, body))
+        if method == "POST" and path == "/api/admin/external-intelligence/import":
+            return self._json(200, external_intelligence.import_upload(
+                conn, user, body, ip=ip, ua=ua))
 
         # --- products (Sprint 6) ---
         if method == "POST" and path == "/api/products/quote":
@@ -485,6 +503,7 @@ def main():
     print("  POST /api/material-lists/<id>/quote-requests ; PATCH /api/material-quote-requests/<id>")
     print("  GET/POST /api/admin/suppliers ; POST /api/admin/catalog/preview|import")
     print("  POST /api/admin/contact-enrichment/preview|import")
+    print("  GET /api/admin/external-intelligence/coverage ; POST .../preview|import")
     print("  GET /api/admin/catalog/imports ; GET/PATCH /api/admin/pricing/delivery")
     print("  GET /api/status/refresh ; GET /api/admin/morning-refresh ; "
           "POST /api/admin/morning-refresh/run")
